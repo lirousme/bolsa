@@ -5,6 +5,7 @@ const { URL } = require('url');
 
 const PORT = Number(process.env.PORT || 3000);
 const SYMBOL = 'CXSE3';
+const BRAPI_BASE_URL = process.env.BRAPI_BASE_URL || 'https://brapi.dev/api';
 
 function loadEnv() {
   const envPath = path.join(__dirname, '.env');
@@ -39,7 +40,7 @@ function sendFile(res, filePath, contentType) {
 }
 
 async function handleVolumeHistory(reqUrl, res) {
-  const token = process.env.TOKEN_BRAPI;
+  const token = process.env.TOKEN_BRAPI || process.env.BRAPI_TOKEN;
   if (!token) {
     sendJson(res, 500, { error: 'TOKEN_BRAPI não configurado no arquivo .env' });
     return;
@@ -47,14 +48,14 @@ async function handleVolumeHistory(reqUrl, res) {
 
   const range = reqUrl.searchParams.get('range') || '7d';
   const interval = reqUrl.searchParams.get('interval') || '1d';
-  const apiUrl = `https://brapi.dev/api/quote/${SYMBOL}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}&token=${encodeURIComponent(token)}`;
+  const apiUrl = `${BRAPI_BASE_URL}/quote/${encodeURIComponent(SYMBOL)}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}&token=${encodeURIComponent(token)}`;
 
   try {
     const response = await fetch(apiUrl);
     const data = await response.json();
 
-    if (!response.ok) {
-      sendJson(res, response.status, {
+    if (!response.ok || data?.status === 'error') {
+      sendJson(res, response.status || 502, {
         error: 'Falha ao buscar dados na BRAPI',
         details: data
       });

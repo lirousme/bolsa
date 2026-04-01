@@ -96,7 +96,11 @@
 
       async function loadVolumeHistory() {
         try {
-          const response = await fetch('/api/volume-history?range=7d&interval=1d');
+          const apiUrl = new URL('api/volume-history', window.location.href);
+          apiUrl.searchParams.set('range', '7d');
+          apiUrl.searchParams.set('interval', '1d');
+
+          const response = await fetch(apiUrl);
           const data = await response.json();
 
           if (!response.ok) {
