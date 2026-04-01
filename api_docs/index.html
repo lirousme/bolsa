@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BRAPI Quote API - Guia Completo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' }
+  </script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <main class="max-w-7xl mx-auto px-6 py-10">
+    <header class="mb-10">
+      <h1 class="text-3xl md:text-4xl font-bold">/api/quote/{tickers} — Guia Completo</h1>
+      <p class="mt-3 text-slate-300">Endpoint principal para cotação, histórico, dividendos, fundamentos e módulos financeiros detalhados.</p>
+      <div class="mt-6 p-4 rounded-xl border border-slate-700 bg-slate-900">
+        <p class="text-sm text-slate-300"><span class="font-semibold text-emerald-300">URL base:</span> <code>https://brapi.dev/api/quote/{tickers}</code></p>
+        <p class="text-sm text-slate-300 mt-2"><span class="font-semibold text-amber-300">Ações de teste sem token:</span> PETR4, MGLU3, VALE3, ITUB4.</p>
+      </div>
+    </header>
+
+    <section>
+      <h2 class="text-2xl font-semibold mb-5">Parâmetros (7 no total)</h2>
+      <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <a href="tickers.html" class="block rounded-2xl border border-slate-700 bg-slate-900 p-5 hover:border-indigo-400 transition">
+          <h3 class="font-semibold text-lg">1) tickers (path)</h3>
+          <p class="text-sm text-slate-300 mt-2">Define um ou mais ativos separados por vírgula.</p>
+        </a>
+        <a href="token.html" class="block rounded-2xl border border-slate-700 bg-slate-900 p-5 hover:border-indigo-400 transition">
+          <h3 class="font-semibold text-lg">2) token (query/header)</h3>
+          <p class="text-sm text-slate-300 mt-2">Autenticação para tickers fora da lista de teste.</p>
+        </a>
+        <a href="range.html" class="block rounded-2xl border border-slate-700 bg-slate-900 p-5 hover:border-indigo-400 transition">
+          <h3 class="font-semibold text-lg">3) range</h3>
+          <p class="text-sm text-slate-300 mt-2">Período do histórico de preço.</p>
+        </a>
+        <a href="interval.html" class="block rounded-2xl border border-slate-700 bg-slate-900 p-5 hover:border-indigo-400 transition">
+          <h3 class="font-semibold text-lg">4) interval</h3>
+          <p class="text-sm text-slate-300 mt-2">Granularidade temporal do histórico.</p>
+        </a>
+        <a href="fundamental.html" class="block rounded-2xl border border-slate-700 bg-slate-900 p-5 hover:border-indigo-400 transition">
+          <h3 class="font-semibold text-lg">5) fundamental</h3>
+          <p class="text-sm text-slate-300 mt-2">Inclui dados P/L e LPA.</p>
+        </a>
+        <a href="dividends.html" class="block rounded-2xl border border-slate-700 bg-slate-900 p-5 hover:border-indigo-400 transition">
+          <h3 class="font-semibold text-lg">6) dividends</h3>
+          <p class="text-sm text-slate-300 mt-2">Inclui histórico de dividendos e JCP.</p>
+        </a>
+        <a href="modules.html" class="block rounded-2xl border border-slate-700 bg-slate-900 p-5 hover:border-indigo-400 transition sm:col-span-2 lg:col-span-1">
+          <h3 class="font-semibold text-lg">7) modules</h3>
+          <p class="text-sm text-slate-300 mt-2">Acopla módulos financeiros avançados.</p>
+        </a>
+      </div>
+    </section>
+
+    <section class="mt-10 rounded-2xl border border-slate-700 bg-slate-900 p-6">
+      <h2 class="text-xl font-semibold">URLs prontas para copiar</h2>
+      <ul class="mt-4 space-y-2 text-sm text-slate-200">
+        <li><code>https://brapi.dev/api/quote/PETR4</code></li>
+        <li><code>https://brapi.dev/api/quote/PETR4?range=1mo&interval=1d</code></li>
+        <li><code>https://brapi.dev/api/quote/ITUB4?fundamental=true&dividends=true</code></li>
+        <li><code>https://brapi.dev/api/quote/WEGE3?modules=summaryProfile,balanceSheetHistory&token=SEU_TOKEN</code></li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>
