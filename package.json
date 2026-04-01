@@ -1,7 +1,7 @@
 {
-  "name": "bolsa-volume-viewer",
-  "version": "1.0.0",
-  "description": "Visualizador de volume histórico via BRAPI",
+  "name": "bolsa-endpoints-console",
+  "version": "2.0.0",
+  "description": "Consulta endpoints da BRAPI, salva respostas no SQLite e exibe histórico em views no index.html",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
