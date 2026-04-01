@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="pt-BR" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bolsa • Direcionador de Views</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+      };
+    </script>
+  </head>
+  <body class="bg-slate-950 text-slate-100 min-h-screen">
+    <main class="max-w-7xl mx-auto p-6 md:p-10">
+      <header class="mb-8">
+        <h1 class="text-3xl md:text-4xl font-bold tracking-tight">Bolsa • Direcionador de Views</h1>
+        <p class="text-slate-300 mt-2">Escolha uma view para abrir no painel abaixo.</p>
+      </header>
+
+      <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8" id="view-list"></section>
+
+      <section class="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-800 text-sm text-slate-300" id="current-view-label"></div>
+        <iframe id="view-frame" class="w-full h-[72vh] bg-slate-950" title="View selecionada"></iframe>
+      </section>
+    </main>
+
+    <script>
+      const views = [
+        {
+          id: 'api-overview',
+          title: 'Visão Geral da API (OpenAPI)',
+          description: 'Resumo completo do que a API permite fazer, com endpoints, parâmetros e respostas.',
+          path: './views/api-overview.html',
+        },
+      ];
+
+      const params = new URLSearchParams(window.location.search);
+      const activeId = params.get('view') || views[0].id;
+      const activeView = views.find((v) => v.id === activeId) || views[0];
+
+      const list = document.getElementById('view-list');
+      const frame = document.getElementById('view-frame');
+      const label = document.getElementById('current-view-label');
+
+      views.forEach((v) => {
+        const isActive = v.id === activeView.id;
+        const card = document.createElement('a');
+        card.href = `?view=${encodeURIComponent(v.id)}`;
+        card.className = [
+          'block rounded-xl border p-4 transition',
+          isActive
+            ? 'border-emerald-500 bg-emerald-500/10'
+            : 'border-slate-800 bg-slate-900/40 hover:border-slate-600 hover:bg-slate-900/70',
+        ].join(' ');
+
+        card.innerHTML = `
+          <h2 class="font-semibold text-lg">${v.title}</h2>
+          <p class="text-slate-300 text-sm mt-1">${v.description}</p>
+          <p class="text-xs text-slate-400 mt-2">ID: ${v.id}</p>
+        `;
+
+        list.appendChild(card);
+      });
+
+      frame.src = activeView.path;
+      label.textContent = `View ativa: ${activeView.title} (${activeView.path})`;
+    </script>
+  </body>
+</html>
