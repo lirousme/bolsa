@@ -1,137 +1,256 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Volume da ação CXSE3 (7 dias)</title>
+    <title>Consulta BRAPI</title>
     <style>
       :root {
         color-scheme: dark;
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
       }
-
-      * {
-        box-sizing: border-box;
-      }
-
       body {
         margin: 0;
-        min-height: 100vh;
-        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-        background: #0b1020;
+        background: #0c1221;
         color: #e8ecf3;
+      }
+      .container {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+      .nav {
         display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 24px;
-      }
-
-      .card {
-        width: min(860px, 100%);
-        background: #121a30;
-        border: 1px solid #263252;
-        border-radius: 14px;
-        padding: 24px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-      }
-
-      h1 {
-        margin-top: 0;
-        font-size: 1.4rem;
-      }
-
-      .subtitle {
-        color: #9fb0d3;
+        gap: 8px;
         margin-bottom: 16px;
       }
-
+      .nav button {
+        border: 1px solid #29417b;
+        background: #152446;
+        color: #e8ecf3;
+        padding: 10px 14px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .nav button.active {
+        background: #2d4fa6;
+      }
+      .panel {
+        border: 1px solid #273b6b;
+        border-radius: 12px;
+        padding: 16px;
+        background: #101a30;
+      }
+      .hidden {
+        display: none;
+      }
+      label {
+        display: block;
+        margin-top: 12px;
+        margin-bottom: 6px;
+        font-weight: 600;
+      }
+      input,
+      select,
+      button,
+      textarea {
+        width: 100%;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #334e86;
+        background: #0e1730;
+        color: #e8ecf3;
+      }
+      button[type='submit'] {
+        margin-top: 12px;
+        cursor: pointer;
+      }
+      pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: #091125;
+        border: 1px solid #23345d;
+        border-radius: 8px;
+        padding: 12px;
+        max-height: 420px;
+        overflow: auto;
+      }
       table {
         width: 100%;
         border-collapse: collapse;
       }
-
       th,
       td {
-        padding: 12px;
-        border-bottom: 1px solid #263252;
+        border-bottom: 1px solid #253659;
         text-align: left;
+        padding: 10px;
+        vertical-align: top;
       }
-
-      th {
-        color: #8ab4ff;
-      }
-
-      .status {
-        margin-bottom: 16px;
-        color: #9fb0d3;
-      }
-
-      .error {
-        color: #ff8383;
+      .muted {
+        color: #9db0dc;
       }
     </style>
   </head>
   <body>
-    <main class="card">
-      <h1>Histórico de volume - CXSE3</h1>
-      <p class="subtitle">Últimos 7 dias (BRAPI)</p>
-      <div id="status" class="status">Carregando...</div>
-      <table id="table" hidden>
-        <thead>
-          <tr>
-            <th>Data</th>
-            <th>Volume</th>
-          </tr>
-        </thead>
-        <tbody id="tbody"></tbody>
-      </table>
+    <main class="container">
+      <h1>Consulta de Endpoints BRAPI</h1>
+      <p class="muted">Escolha o endpoint, envie os parâmetros e veja o histórico salvo no banco local SQLite.</p>
+
+      <div class="nav">
+        <button id="tab-query" class="active">Consultar endpoint</button>
+        <button id="tab-history">Histórico</button>
+      </div>
+
+      <section id="view-query" class="panel">
+        <form id="query-form">
+          <label for="endpoint">Endpoint</label>
+          <select id="endpoint" required></select>
+
+          <label for="params">Parâmetros (JSON)</label>
+          <textarea id="params" rows="6">{
+  "ticker": "PETR4",
+  "modules": "balanceSheetHistory",
+  "dividends": "true"
+}</textarea>
+
+          <button type="submit">Consultar e salvar</button>
+        </form>
+
+        <h3>Resposta</h3>
+        <pre id="response">Aguardando consulta...</pre>
+      </section>
+
+      <section id="view-history" class="panel hidden">
+        <button id="refresh-history">Atualizar histórico</button>
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Endpoint</th>
+              <th>Status</th>
+              <th>Request URL</th>
+            </tr>
+          </thead>
+          <tbody id="history-body">
+            <tr>
+              <td colspan="4">Sem dados.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
     </main>
 
     <script>
-      const statusEl = document.getElementById('status');
-      const tableEl = document.getElementById('table');
-      const tbodyEl = document.getElementById('tbody');
+      const endpointSelect = document.getElementById('endpoint');
+      const paramsInput = document.getElementById('params');
+      const responseEl = document.getElementById('response');
+      const historyBody = document.getElementById('history-body');
 
-      const formatNumber = (value) =>
-        new Intl.NumberFormat('pt-BR').format(Number(value || 0));
+      const tabQuery = document.getElementById('tab-query');
+      const tabHistory = document.getElementById('tab-history');
+      const viewQuery = document.getElementById('view-query');
+      const viewHistory = document.getElementById('view-history');
 
-      async function loadVolumeHistory() {
-        try {
-          const apiUrl = new URL('api/volume-history', window.location.href);
-          apiUrl.searchParams.set('range', '7d');
-          apiUrl.searchParams.set('interval', '1d');
+      const presets = {
+        quoteTicker: {
+          ticker: 'PETR4',
+          modules: 'balanceSheetHistory',
+          dividends: 'true'
+        },
+        quoteList: { tickers: 'PETR4,VALE3' },
+        crypto: { symbols: 'BTC.BRL' },
+        currency: { symbols: 'USD.BRL' },
+        inflation: { country: 'BR' },
+        primeRate: {}
+      };
 
-          const response = await fetch(apiUrl);
-          const data = await response.json();
-
-          if (!response.ok) {
-            throw new Error(data?.error || 'Erro ao carregar dados');
-          }
-
-          tbodyEl.innerHTML = '';
-
-          if (!data.volumeHistory.length) {
-            statusEl.textContent = 'Sem dados para exibir no período.';
-            return;
-          }
-
-          data.volumeHistory.forEach((item) => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-              <td>${item.date}</td>
-              <td>${formatNumber(item.volume)}</td>
-            `;
-            tbodyEl.appendChild(tr);
-          });
-
-          statusEl.textContent = 'Dados carregados com sucesso.';
-          tableEl.hidden = false;
-        } catch (error) {
-          statusEl.classList.add('error');
-          statusEl.textContent = `Falha: ${error.message}`;
-        }
+      function setView(view) {
+        const isQuery = view === 'query';
+        viewQuery.classList.toggle('hidden', !isQuery);
+        viewHistory.classList.toggle('hidden', isQuery);
+        tabQuery.classList.toggle('active', isQuery);
+        tabHistory.classList.toggle('active', !isQuery);
       }
 
-      loadVolumeHistory();
+      async function loadEndpoints() {
+        const response = await fetch('/api/endpoints');
+        const data = await response.json();
+        endpointSelect.innerHTML = '';
+
+        data.endpoints.forEach((item) => {
+          const option = document.createElement('option');
+          option.value = item.key;
+          option.textContent = `${item.path} — ${item.description}`;
+          endpointSelect.appendChild(option);
+        });
+
+        endpointSelect.value = 'quoteTicker';
+        paramsInput.value = JSON.stringify(presets.quoteTicker, null, 2);
+      }
+
+      async function submitQuery(event) {
+        event.preventDefault();
+
+        let params;
+        try {
+          params = JSON.parse(paramsInput.value || '{}');
+        } catch {
+          responseEl.textContent = 'JSON inválido nos parâmetros.';
+          return;
+        }
+
+        const endpointKey = endpointSelect.value;
+        responseEl.textContent = 'Consultando...';
+
+        const response = await fetch('/api/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpointKey, params })
+        });
+
+        const data = await response.json();
+        responseEl.textContent = JSON.stringify(data, null, 2);
+      }
+
+      async function loadHistory() {
+        const response = await fetch('/api/history?limit=30');
+        const data = await response.json();
+        const items = Array.isArray(data.items) ? data.items : [];
+
+        if (items.length === 0) {
+          historyBody.innerHTML = '<tr><td colspan="4">Sem consultas salvas.</td></tr>';
+          return;
+        }
+
+        historyBody.innerHTML = items
+          .map(
+            (item) => `
+            <tr>
+              <td>${item.createdAt}</td>
+              <td>${item.endpointKey}</td>
+              <td>${item.statusCode}</td>
+              <td><code>${item.requestUrl}</code></td>
+            </tr>
+          `
+          )
+          .join('');
+      }
+
+      endpointSelect.addEventListener('change', () => {
+        const preset = presets[endpointSelect.value] || {};
+        paramsInput.value = JSON.stringify(preset, null, 2);
+      });
+
+      document.getElementById('query-form').addEventListener('submit', submitQuery);
+      document.getElementById('refresh-history').addEventListener('click', loadHistory);
+
+      tabQuery.addEventListener('click', () => setView('query'));
+      tabHistory.addEventListener('click', async () => {
+        setView('history');
+        await loadHistory();
+      });
+
+      loadEndpoints();
     </script>
   </body>
 </html>
