@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Endpoints Disponíveis</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      body {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      h1 {
+        margin-bottom: 8px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 16px;
+      }
+
+      th,
+      td {
+        padding: 10px;
+        border: 1px solid #c6c6c6;
+        text-align: left;
+      }
+
+      code {
+        font-weight: 600;
+      }
+
+      .muted {
+        opacity: 0.8;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Endpoints disponíveis</h1>
+    <p class="muted">Fonte: <code>GET /api/endpoints</code></p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Método</th>
+          <th>Path</th>
+          <th>Descrição</th>
+        </tr>
+      </thead>
+      <tbody id="endpoints-body">
+        <tr>
+          <td colspan="3">Carregando...</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <script>
+      async function loadEndpoints() {
+        const tbody = document.getElementById('endpoints-body');
+        try {
+          const response = await fetch('/api/endpoints');
+          const data = await response.json();
+          const endpoints = Array.isArray(data?.endpoints) ? data.endpoints : [];
+
+          if (!response.ok || endpoints.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3">Nenhum endpoint encontrado.</td></tr>';
+            return;
+          }
+
+          tbody.innerHTML = endpoints
+            .map(
+              (item) => `
+              <tr>
+                <td><code>${item.method}</code></td>
+                <td><code>${item.path}</code></td>
+                <td>${item.description}</td>
+              </tr>`
+            )
+            .join('');
+        } catch (error) {
+          tbody.innerHTML = `<tr><td colspan="3">Erro ao carregar endpoints: ${error.message}</td></tr>`;
+        }
+      }
+
+      loadEndpoints();
+    </script>
+  </body>
+</html>

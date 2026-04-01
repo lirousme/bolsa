@@ -6,6 +6,12 @@ const { URL } = require('url');
 const PORT = Number(process.env.PORT || 3000);
 const SYMBOL = 'CXSE3';
 const BRAPI_BASE_URL = process.env.BRAPI_BASE_URL || 'https://brapi.dev/api';
+const AVAILABLE_ENDPOINTS = [
+  { method: 'GET', path: '/', description: 'Página inicial da aplicação' },
+  { method: 'GET', path: '/endpoints.html', description: 'Página com a lista de endpoints disponíveis' },
+  { method: 'GET', path: '/api/endpoints', description: 'Lista de endpoints em formato JSON' },
+  { method: 'GET', path: '/api/volume-history?range=7d&interval=1d', description: 'Histórico de volume para o símbolo CXSE3' }
+];
 
 function loadEnv() {
   const envPath = path.join(__dirname, '.env');
@@ -83,6 +89,16 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'GET' && reqUrl.pathname === '/') {
     sendFile(res, path.join(__dirname, 'public', 'index.html'), 'text/html; charset=utf-8');
+    return;
+  }
+
+  if (req.method === 'GET' && reqUrl.pathname === '/endpoints.html') {
+    sendFile(res, path.join(__dirname, 'public', 'endpoints.html'), 'text/html; charset=utf-8');
+    return;
+  }
+
+  if (req.method === 'GET' && reqUrl.pathname === '/api/endpoints') {
+    sendJson(res, 200, { endpoints: AVAILABLE_ENDPOINTS });
     return;
   }
 
