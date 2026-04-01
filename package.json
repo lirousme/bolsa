@@ -1,0 +1,9 @@
+{
+  "name": "bolsa-volume-viewer",
+  "version": "1.0.0",
+  "description": "Visualizador de volume histórico via BRAPI",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
