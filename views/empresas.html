@@ -114,6 +114,18 @@
     .status.ok { color: var(--ok); }
     .status.warn { color: var(--warn); }
 
+    .inline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+
+    .inline input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
@@ -181,17 +193,26 @@
 <body>
   <main class="container">
     <h1>Preencher empresas via Brapi (summaryProfile)</h1>
-    <p class="hint">Esta tela usa apenas atributos de <code>results[].summaryProfile</code> e processa até 20 tickers por lote.</p>
+    <p class="hint">A tela usa apenas atributos de <code>results[].summaryProfile</code> e processa até 20 tickers por lote.</p>
 
     <div class="grid">
       <p class="hint">Token carregado do servidor (variável <code>TOKEN_BRAPI</code> do arquivo <code>.env</code>).</p>
 
       <label for="tickers">Tickers (separados por vírgula, sem espaço)</label>
       <textarea id="tickers" rows="4" placeholder="LEVE3,WIZC3,CXSE3,BRSR6"></textarea>
-      <p class="hint">Exemplo de endpoint por lote: <code>https://brapi.dev/api/quote/MGLU3,PETR4?modules=summaryProfile&token=SEU_TOKEN</code></p>
+      <p class="hint">Exemplo de endpoint por lote: <code>https://brapi.dev/api/quote/MGLU3,PETR4?modules=summaryProfile&amp;token=SEU_TOKEN</code></p>
+
+      <label class="inline" for="salvarBanco">
+        <input type="checkbox" id="salvarBanco" checked />
+        Tentar salvar no banco via endpoint interno
+      </label>
+
+      <label for="endpointSalvar">Endpoint interno para persistir no banco</label>
+      <input id="endpointSalvar" value="/api/empresas/summary-profile/import" />
+      <p class="hint">Payload enviado por lote: <code>{ empresas: [{ ticker, summaryProfile }] }</code>. Se o endpoint não existir, o SQL continua sendo gerado para execução manual.</p>
 
       <div class="actions">
-        <button class="primary" id="btnProcessar">Buscar e gerar SQL</button>
+        <button class="primary" id="btnProcessar">Buscar e processar</button>
         <button class="ghost" id="btnCopiar" disabled>Copiar SQL</button>
       </div>
     </div>
@@ -235,7 +256,7 @@
     let sqlGerado = '';
 
     const tokenMeta = document.querySelector('meta[name="token-brapi"]');
-    const TOKEN_BRAPI = (tokenMeta?.content || "").trim();
+    const TOKEN_BRAPI = (tokenMeta?.content || '').trim();
 
     function dividirEmLotes(arr, tamanho) {
       const lotes = [];
@@ -252,22 +273,30 @@
       return `'${String(valor).replace(/'/g, "''")}'`;
     }
 
+    function normalizarSummaryProfile(profile) {
+      const normalized = {};
+      for (const campo of CAMPOS) {
+        normalized[campo] = profile?.[campo] ?? null;
+      }
+      return normalized;
+    }
+
     function montarUpsert(symbol, profile) {
-      const colunas = ['ticker', ...CAMPOS];
+      const colunas = ['ticker', ...CAMPOS].map(col => `\`${col}\``);
       const valores = [escapeSql(symbol.toUpperCase())];
 
       for (const campo of CAMPOS) {
         valores.push(escapeSql(profile?.[campo] ?? null));
       }
 
-      const updates = CAMPOS.map(c => `${c}=VALUES(${c})`).join(', ');
+      const updates = CAMPOS.map(c => `\`${c}\`=VALUES(\`${c}\`)`).join(', ');
       return `INSERT INTO empresas (${colunas.join(', ')}) VALUES (${valores.join(', ')}) ON DUPLICATE KEY UPDATE ${updates};`;
     }
 
-    function atualizarModal(concluidos, total) {
+    function atualizarModal(concluidos, total, empresasFeitas, empresasTotal) {
       const pendentes = total - concluidos;
       const pct = total === 0 ? 0 : Math.round((concluidos / total) * 100);
-      modalText.textContent = `Lotes concluídos: ${concluidos}/${total} • Restantes: ${pendentes}`;
+      modalText.textContent = `Lotes: ${concluidos}/${total} • Restantes: ${pendentes} • Empresas processadas: ${empresasFeitas}/${empresasTotal}`;
       bar.style.width = `${pct}%`;
     }
 
@@ -280,6 +309,26 @@
       }
       const data = await resp.json();
       return data.results || [];
+    }
+
+    async function salvarLoteNoBanco(endpoint, rows) {
+      const payload = {
+        empresas: rows.map((row) => ({
+          ticker: String(row.symbol || '').toUpperCase(),
+          summaryProfile: normalizarSummaryProfile(row.summaryProfile)
+        }))
+      };
+
+      const resp = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!resp.ok) {
+        const body = await resp.text();
+        throw new Error(`Falha ao salvar lote (${resp.status}): ${body || 'sem detalhe'}`);
+      }
     }
 
     function montarTabela(rows) {
@@ -318,11 +367,13 @@
 
     btnProcessar.addEventListener('click', async () => {
       const token = TOKEN_BRAPI;
+      const salvarBanco = document.getElementById('salvarBanco').checked;
+      const endpointSalvar = document.getElementById('endpointSalvar').value.trim();
       const tickersRaw = document.getElementById('tickers').value.trim();
 
       if (!token) return alert('TOKEN_BRAPI não configurado no servidor (.env).');
       if (!tickersRaw) return alert('Informe pelo menos um ticker.');
-
+      if (salvarBanco && !endpointSalvar) return alert('Informe o endpoint de persistência para salvar no banco.');
 
       const tickers = [...new Set(tickersRaw.split(',').map(t => t.trim().toUpperCase()).filter(Boolean))];
       if (!tickers.length) return alert('Nenhum ticker válido encontrado.');
@@ -333,29 +384,53 @@
 
       resultado.hidden = true;
       modal.style.display = 'flex';
-      atualizarModal(0, lotes.length);
+      atualizarModal(0, lotes.length, 0, tickers.length);
 
       let concluido = 0;
       let ignorados = 0;
+      let salvosBanco = 0;
+      let erroSalvarBanco = '';
 
       try {
         for (const lote of lotes) {
           const rows = await buscarLote(lote, token);
+          const validRows = [];
+
           for (const row of rows) {
             if (!row?.summaryProfile) {
               ignorados++;
               continue;
             }
-            todasRows.push(row);
-            sqlGerado += `${montarUpsert(row.symbol, row.summaryProfile)}\n`;
+
+            const profile = normalizarSummaryProfile(row.summaryProfile);
+            const normalizedRow = { symbol: row.symbol, summaryProfile: profile };
+            validRows.push(normalizedRow);
+            todasRows.push(normalizedRow);
+            sqlGerado += `${montarUpsert(row.symbol, profile)}\n`;
           }
+
+          if (salvarBanco && validRows.length) {
+            try {
+              await salvarLoteNoBanco(endpointSalvar, validRows);
+              salvosBanco += validRows.length;
+            } catch (err) {
+              erroSalvarBanco = err.message;
+            }
+          }
+
           concluido++;
-          atualizarModal(concluido, lotes.length);
+          atualizarModal(concluido, lotes.length, Math.min(concluido * MAX_POR_LOTE, tickers.length), tickers.length);
         }
 
+        const msgSalvar = salvarBanco
+          ? (erroSalvarBanco
+              ? ` Salvamento no banco falhou: ${erroSalvarBanco}`
+              : ` ${salvosBanco} empresa(s) enviada(s) para persistência no banco.`)
+          : ' Salvamento no banco desativado.';
+
         statusEl.textContent = 'Processamento concluído.';
-        statusEl.className = 'status ok';
-        resumoEl.textContent = `Tickers informados: ${tickers.length}. Empresas com summaryProfile: ${todasRows.length}. Ignoradas (sem summaryProfile): ${ignorados}.`;
+        statusEl.className = erroSalvarBanco ? 'status warn' : 'status ok';
+        resumoEl.textContent = `Tickers informados: ${tickers.length}. Empresas com summaryProfile: ${todasRows.length}. Ignoradas (sem summaryProfile): ${ignorados}.${msgSalvar}`;
         sqlEl.textContent = sqlGerado || '-- Nenhum SQL gerado.';
         montarTabela(todasRows);
         btnCopiar.disabled = !sqlGerado;
