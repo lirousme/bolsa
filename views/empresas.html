@@ -38,24 +38,12 @@
       box-shadow: 0 6px 24px rgba(15, 23, 42, .08);
     }
 
-    h1 {
-      margin: 0 0 4px;
-      font-size: 28px;
-    }
+    h1 { margin: 0 0 4px; font-size: 28px; }
+    .subtitle { margin: 0 0 18px; color: var(--muted); font-size: 14px; }
 
-    .subtitle {
-      margin: 0 0 18px;
-      color: var(--muted);
-      font-size: 14px;
-    }
+    label { display: block; margin-bottom: 8px; font-weight: 700; }
 
-    label {
-      display: block;
-      margin-bottom: 8px;
-      font-weight: 700;
-    }
-
-    textarea, input {
+    textarea {
       width: 100%;
       border: 1px solid var(--border);
       border-radius: 10px;
@@ -63,26 +51,13 @@
       font-size: 15px;
       color: inherit;
       background: transparent;
-    }
-
-    textarea {
       min-height: 120px;
       resize: vertical;
     }
 
-    .hint {
-      margin: 8px 0 0;
-      color: var(--muted);
-      font-size: 13px;
-    }
+    .hint { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
 
-    .actions {
-      margin-top: 16px;
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
+    .actions { margin-top: 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
     button {
       border: none;
@@ -95,34 +70,15 @@
       cursor: pointer;
     }
 
-    button:disabled {
-      opacity: .65;
-      cursor: not-allowed;
-    }
+    button:disabled { opacity: .65; cursor: not-allowed; }
 
-    .result {
-      margin-top: 20px;
-      border-top: 1px solid var(--border);
-      padding-top: 16px;
-    }
-
+    .result { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px; }
     .status { font-weight: 700; margin-bottom: 6px; }
     .status.ok { color: var(--ok); }
     .status.warn { color: var(--warn); }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 12px;
-      font-size: 13px;
-    }
-
-    th, td {
-      border: 1px solid var(--border);
-      padding: 8px;
-      text-align: left;
-      vertical-align: top;
-    }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+    th, td { border: 1px solid var(--border); padding: 8px; text-align: left; vertical-align: top; }
 
     .modal-overlay {
       position: fixed;
@@ -164,18 +120,15 @@
 <body>
   <main class="container">
     <h1>Atualizar empresas</h1>
-    <p class="subtitle">Busca diretamente na Brapi (quote + summaryProfile) e envia o JSON para persistência no backend.</p>
+    <p class="subtitle">Os tickers são enviados ao backend PHP, que usa TOKEN_BRAPI do arquivo <code>.env</code>, busca <code>summaryProfile</code> na Brapi e salva no banco.</p>
 
-    <label for="token">Token da Brapi (obrigatório para todas as ações)</label>
-    <input id="token" type="password" autocomplete="off" placeholder="Cole aqui seu token da Brapi" />
-
-    <label for="tickers" style="margin-top: 12px;">Tickers</label>
+    <label for="tickers">Tickers</label>
     <textarea id="tickers" placeholder="LEVE3,WIZC3,CXSE3,BRSR6"></textarea>
-    <p class="hint">Limite da Brapi: 20 por requisição. Acima disso, o sistema envia em lotes automaticamente.</p>
+    <p class="hint">Separe por vírgula e sem espaço. Acima de 20 tickers, serão feitos lotes automáticos com progresso.</p>
 
     <div class="actions">
       <button id="btnProcessar">Atualizar agora</button>
-      <span class="hint">Sem uso de endpoint /import.</span>
+      <span class="hint">Endpoint local: <code>POST /api/empresas.php</code></span>
     </div>
 
     <section class="result" id="resultado" hidden>
@@ -195,11 +148,10 @@
 
   <script>
     const MAX_POR_LOTE = 20;
-    const BRAPI_BASE_URL = 'https://brapi.dev/api/quote';
-    const ENDPOINTS_SALVAR = ['/api/empresas', '/api/empresas/sync'];
+    const ENDPOINT_SALVAR = '/api/empresas.php';
+    const camposTabela = ['ticker', 'name', 'industry', 'sector', 'city', 'state', 'website'];
 
     const btnProcessar = document.getElementById('btnProcessar');
-    const tokenInput = document.getElementById('token');
     const tickersInput = document.getElementById('tickers');
     const resultado = document.getElementById('resultado');
     const statusEl = document.getElementById('status');
@@ -209,8 +161,6 @@
     const modal = document.getElementById('modal');
     const modalText = document.getElementById('modalText');
     const bar = document.getElementById('bar');
-
-    const camposTabela = ['ticker', 'name', 'industry', 'sector', 'city', 'state', 'website'];
 
     function dividirEmLotes(arr, tamanho) {
       const lotes = [];
@@ -227,60 +177,23 @@
       bar.style.width = `${pct}%`;
     }
 
-    async function buscarNaBrapi(tickersLote, token) {
-      const tickersCsv = encodeURIComponent(tickersLote.join(','));
-      const query = new URLSearchParams({ modules: 'summaryProfile', token });
-      const url = `${BRAPI_BASE_URL}/${tickersCsv}?${query.toString()}`;
-
-      const resp = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
+    async function processarLote(tickersLote) {
+      const resp = await fetch(ENDPOINT_SALVAR, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tickers: tickersLote })
       });
 
       const payload = await resp.json().catch(() => ({}));
       if (!resp.ok) {
-        throw new Error(payload.message || `Falha na Brapi (${resp.status}).`);
+        throw new Error(payload.message || `Falha ao salvar lote (${resp.status}).`);
       }
 
-      return Array.isArray(payload.results) ? payload.results : [];
-    }
-
-    async function salvarNoBanco(results, token) {
-      let ultimaFalha = null;
-
-      for (const endpoint of ENDPOINTS_SALVAR) {
-        const resp = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ results })
-        });
-
-        const payload = await resp.json().catch(() => ({}));
-        if (resp.ok) {
-          return {
-            salvos: Number(payload.salvos ?? payload.saved ?? results.length),
-            ignorados: Number(payload.ignorados ?? payload.skipped ?? 0),
-            rows: Array.isArray(payload.empresas) ? payload.empresas :
-                  Array.isArray(payload.results) ? payload.results : results
-          };
-        }
-
-        ultimaFalha = payload.message || `Falha ao salvar no endpoint ${endpoint} (${resp.status}).`;
-        if (resp.status !== 404) break;
-      }
-
-      throw new Error(ultimaFalha || 'Falha ao salvar dados no backend.');
-    }
-
-    async function processarLote(tickersLote, token) {
-      const results = await buscarNaBrapi(tickersLote, token);
-      return salvarNoBanco(results, token);
+      return {
+        salvos: Number(payload.salvos ?? 0),
+        ignorados: Number(payload.ignorados ?? 0),
+        rows: Array.isArray(payload.empresas) ? payload.empresas : []
+      };
     }
 
     function montarTabela(rows) {
@@ -301,7 +214,7 @@
         const tr = document.createElement('tr');
         camposTabela.forEach((campo) => {
           const td = document.createElement('td');
-          td.textContent = row?.[campo] ?? row?.summaryProfile?.[campo] ?? row?.symbol ?? '';
+          td.textContent = row?.[campo] ?? '';
           tr.appendChild(td);
         });
         tbody.appendChild(tr);
@@ -312,12 +225,6 @@
     }
 
     btnProcessar.addEventListener('click', async () => {
-      const token = tokenInput.value.trim();
-      if (!token) {
-        alert('Informe o token da Brapi.');
-        return;
-      }
-
       const raw = tickersInput.value.trim();
       if (!raw) {
         alert('Informe pelo menos um ticker.');
@@ -346,7 +253,7 @@
       try {
         for (const lote of lotes) {
           try {
-            const resposta = await processarLote(lote, token);
+            const resposta = await processarLote(lote);
             salvos += resposta.salvos;
             ignorados += resposta.ignorados;
             previewRows.push(...resposta.rows);
@@ -365,7 +272,7 @@
       } catch (error) {
         statusEl.textContent = `Falha geral: ${error.message}`;
         statusEl.className = 'status warn';
-        resumoEl.textContent = 'Verifique token da Brapi, conectividade com https://brapi.dev/api/quote e endpoint local /api/empresas.';
+        resumoEl.textContent = 'Verifique o .env, o banco de dados e conectividade com a Brapi.';
       } finally {
         modal.style.display = 'none';
         btnProcessar.disabled = false;
