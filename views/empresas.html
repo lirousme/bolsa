@@ -183,9 +183,12 @@
     <p class="hint">Esta tela usa apenas atributos de <code>results[].summaryProfile</code> e processa até 20 tickers por lote.</p>
 
     <div class="grid">
+      <label for="token">TOKEN_BRAPI</label>
+      <input id="token" type="password" placeholder="Informe seu token" />
+
       <label for="tickers">Tickers (separados por vírgula, sem espaço)</label>
       <textarea id="tickers" rows="4" placeholder="LEVE3,WIZC3,CXSE3,BRSR6"></textarea>
-      <p class="hint">O token é lido do <code>.env</code> no backend (<code>TOKEN_BRAPI</code>). Esta tela chama apenas o proxy local.</p>
+      <p class="hint">Exemplo de endpoint por lote: <code>https://brapi.dev/api/quote/MGLU3,PETR4?modules=summaryProfile&token=SEU_TOKEN</code></p>
 
       <div class="actions">
         <button class="primary" id="btnProcessar">Buscar e gerar SQL</button>
@@ -266,8 +269,8 @@
       bar.style.width = `${pct}%`;
     }
 
-    async function buscarLote(tickers) {
-      const endpoint = `/api/brapi/quote/${tickers.join(',')}?modules=summaryProfile`;
+    async function buscarLote(tickers, token) {
+      const endpoint = `https://brapi.dev/api/quote/${tickers.join(',')}?modules=summaryProfile&token=${encodeURIComponent(token)}`;
       const resp = await fetch(endpoint);
       if (!resp.ok) {
         const texto = await resp.text();
@@ -312,8 +315,10 @@
     }
 
     btnProcessar.addEventListener('click', async () => {
+      const token = document.getElementById('token').value.trim();
       const tickersRaw = document.getElementById('tickers').value.trim();
 
+      if (!token) return alert('Informe o TOKEN_BRAPI.');
       if (!tickersRaw) return alert('Informe pelo menos um ticker.');
 
       const tickers = [...new Set(tickersRaw.split(',').map(t => t.trim().toUpperCase()).filter(Boolean))];
@@ -332,7 +337,7 @@
 
       try {
         for (const lote of lotes) {
-          const rows = await buscarLote(lote);
+          const rows = await buscarLote(lote, token);
           for (const row of rows) {
             if (!row?.summaryProfile) {
               ignorados++;
@@ -354,7 +359,7 @@
       } catch (err) {
         statusEl.textContent = `Falha: ${err.message}`;
         statusEl.className = 'status warn';
-        resumoEl.textContent = 'Revise conectividade, endpoint proxy (/api/brapi/quote/...) e símbolos enviados.';
+        resumoEl.textContent = 'Revise token, conectividade e símbolos enviados.';
         sqlEl.textContent = sqlGerado || '-- Sem SQL por falha na requisição.';
         btnCopiar.disabled = !sqlGerado;
       } finally {
