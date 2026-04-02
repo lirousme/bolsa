@@ -3,95 +3,98 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="token-brapi" content="{{ TOKEN_BRAPI }}" />
-  <title>Atualização de Empresas (Brapi)</title>
+  <title>Atualização de Empresas</title>
   <style>
     :root {
-      color-scheme: light dark;
-      --bg: #f4f6fb;
+      --bg: #f5f7ff;
       --card: #ffffff;
-      --text: #14213d;
+      --text: #0f172a;
       --muted: #475569;
       --accent: #2563eb;
-      --ok: #16a34a;
-      --warn: #d97706;
-      --border: #dbe3ef;
+      --ok: #15803d;
+      --warn: #b45309;
+      --border: #dbe5f2;
     }
 
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #0f172a;
-        --card: #111827;
-        --text: #e5e7eb;
-        --muted: #9ca3af;
-        --accent: #60a5fa;
-        --ok: #34d399;
-        --warn: #f59e0b;
-        --border: #334155;
-      }
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
-      font-family: Arial, Helvetica, sans-serif;
+      font-family: Inter, Arial, Helvetica, sans-serif;
       background: var(--bg);
       color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 16px;
     }
 
     .container {
-      max-width: 980px;
-      margin: 32px auto;
+      width: min(860px, 100%);
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 24px;
-      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+      box-shadow: 0 6px 24px rgba(15, 23, 42, .08);
     }
 
-    h1 { margin-top: 0; }
-
-    .grid {
-      display: grid;
-      gap: 12px;
+    h1 {
+      margin: 0 0 4px;
+      font-size: 28px;
     }
 
-    label { font-weight: 700; }
+    .subtitle {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
 
     textarea {
       width: 100%;
+      min-height: 120px;
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px;
-      font-size: 14px;
-      box-sizing: border-box;
-      background: transparent;
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 15px;
+      resize: vertical;
       color: inherit;
+      background: transparent;
+    }
+
+    .hint {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 13px;
     }
 
     .actions {
+      margin-top: 16px;
       display: flex;
       gap: 10px;
+      align-items: center;
       flex-wrap: wrap;
-      margin-top: 8px;
     }
 
     button {
       border: none;
-      border-radius: 8px;
-      padding: 10px 16px;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #fff;
       font-weight: 700;
+      font-size: 15px;
+      padding: 10px 18px;
       cursor: pointer;
     }
 
-    .primary {
-      background: var(--accent);
-      color: white;
-    }
-
-    .hint {
-      color: var(--muted);
-      margin: 6px 0 0;
-      font-size: 13px;
+    button:disabled {
+      opacity: .65;
+      cursor: not-allowed;
     }
 
     .result {
@@ -100,11 +103,7 @@
       padding-top: 16px;
     }
 
-    .status {
-      font-weight: 700;
-      margin-bottom: 10px;
-    }
-
+    .status { font-weight: 700; margin-bottom: 6px; }
     .status.ok { color: var(--ok); }
     .status.warn { color: var(--warn); }
 
@@ -122,35 +121,33 @@
       vertical-align: top;
     }
 
-    code {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    }
-
     .modal-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,.55);
+      background: rgba(2, 6, 23, .6);
       display: none;
       align-items: center;
       justify-content: center;
       padding: 16px;
+      z-index: 20;
     }
 
     .modal {
-      width: min(500px, 100%);
+      width: min(460px, 100%);
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 18px;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
     }
 
     .progress {
       width: 100%;
       height: 12px;
-      border-radius: 999px;
-      background: rgba(100,100,100,.25);
+      border-radius: 99px;
+      background: #cbd5e1;
       overflow: hidden;
-      margin-top: 10px;
+      margin-top: 12px;
     }
 
     .progress > div {
@@ -163,17 +160,16 @@
 </head>
 <body>
   <main class="container">
-    <h1>Atualizar cadastro de empresas</h1>
-    <p class="hint">Informe os tickers e o sistema atualiza automaticamente o banco usando apenas <code>results[].summaryProfile</code>.</p>
+    <h1>Atualizar empresas</h1>
+    <p class="subtitle">Digite os tickers separados por vírgula. O sistema busca na Brapi e já grava no MySQL automaticamente.</p>
 
-    <div class="grid">
-      <label for="tickers">Tickers (separados por vírgula, sem espaço)</label>
-      <textarea id="tickers" rows="4" placeholder="LEVE3,WIZC3,CXSE3,BRSR6"></textarea>
-      <p class="hint">Até 20 empresas por requisição. Se passar disso, será feito automaticamente em lotes.</p>
+    <label for="tickers">Tickers</label>
+    <textarea id="tickers" placeholder="LEVE3,WIZC3,CXSE3,BRSR6"></textarea>
+    <p class="hint">Limite da Brapi: 20 por requisição. Acima disso, o sistema envia em lotes sem você se preocupar.</p>
 
-      <div class="actions">
-        <button class="primary" id="btnProcessar">Atualizar empresas</button>
-      </div>
+    <div class="actions">
+      <button id="btnProcessar">Atualizar agora</button>
+      <span class="hint">Sem etapa manual de “salvar no banco”.</span>
     </div>
 
     <section class="result" id="resultado" hidden>
@@ -185,7 +181,7 @@
 
   <div class="modal-overlay" id="modal">
     <div class="modal">
-      <h3>Atualizando empresas</h3>
+      <h3>Processando importação</h3>
       <p id="modalText">Iniciando...</p>
       <div class="progress"><div id="bar"></div></div>
     </div>
@@ -193,14 +189,10 @@
 
   <script>
     const MAX_POR_LOTE = 20;
-    const ENDPOINT_SALVAR = '/api/empresas/summary-profile/import';
-    const CAMPOS = [
-      'address1','address2','address3','city','state','zip','country','phone','fax','website',
-      'industry','industryKey','industryDisp','sector','sectorKey','sectorDisp','longBusinessSummary',
-      'fullTimeEmployees','companyOfficers','twitter','name','startDate','description','logoUrl','cnpj'
-    ];
+    const ENDPOINT_IMPORTAR = '/api/empresas/summary-profile/import';
 
     const btnProcessar = document.getElementById('btnProcessar');
+    const tickersInput = document.getElementById('tickers');
     const resultado = document.getElementById('resultado');
     const statusEl = document.getElementById('status');
     const resumoEl = document.getElementById('resumo');
@@ -209,8 +201,8 @@
     const modal = document.getElementById('modal');
     const modalText = document.getElementById('modalText');
     const bar = document.getElementById('bar');
-    const tokenMeta = document.querySelector('meta[name="token-brapi"]');
-    const TOKEN_BRAPI = (tokenMeta?.content || '').trim();
+
+    const camposTabela = ['ticker', 'name', 'industry', 'sector', 'city', 'state', 'website'];
 
     function dividirEmLotes(arr, tamanho) {
       const lotes = [];
@@ -220,148 +212,113 @@
       return lotes;
     }
 
-    function normalizarSummaryProfile(profile) {
-      const normalized = {};
-      for (const campo of CAMPOS) {
-        normalized[campo] = profile?.[campo] ?? null;
-      }
-      return normalized;
-    }
-
     function atualizarModal(concluidos, total, empresasFeitas, empresasTotal) {
       const pendentes = Math.max(total - concluidos, 0);
-      const pct = total === 0 ? 0 : Math.round((concluidos / total) * 100);
-      modalText.textContent = `Lotes: ${concluidos}/${total} • Restantes: ${pendentes} • Empresas processadas: ${empresasFeitas}/${empresasTotal}`;
+      const pct = total ? Math.round((concluidos / total) * 100) : 0;
+      modalText.textContent = `Lotes: ${concluidos}/${total} • Restantes: ${pendentes} • Empresas: ${empresasFeitas}/${empresasTotal}`;
       bar.style.width = `${pct}%`;
     }
 
-    async function buscarLote(tickers, token) {
-      const endpoint = `https://brapi.dev/api/quote/${tickers.join(',')}?modules=summaryProfile&token=${encodeURIComponent(token)}`;
-      const resp = await fetch(endpoint);
-      if (!resp.ok) {
-        const texto = await resp.text();
-        throw new Error(`Erro HTTP ${resp.status}: ${texto || 'sem detalhe'}`);
-      }
-      const data = await resp.json();
-      return data.results || [];
-    }
-
-    async function salvarLoteNoBanco(endpoint, rows) {
-      const payload = {
-        empresas: rows.map((row) => ({
-          ticker: String(row.symbol || '').toUpperCase(),
-          summaryProfile: normalizarSummaryProfile(row.summaryProfile)
-        }))
-      };
-
-      const resp = await fetch(endpoint, {
+    async function importarLote(tickersLote) {
+      const resp = await fetch(ENDPOINT_IMPORTAR, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ tickers: tickersLote })
       });
 
+      const payload = await resp.json().catch(() => ({}));
       if (!resp.ok) {
-        const body = await resp.text();
-        throw new Error(`Falha ao salvar lote (${resp.status}): ${body || 'sem detalhe'}`);
+        throw new Error(payload.message || `Falha ao importar lote (${resp.status}).`);
       }
+
+      return {
+        salvos: Number(payload.salvos ?? payload.saved ?? tickersLote.length),
+        ignorados: Number(payload.ignorados ?? payload.skipped ?? 0),
+        rows: Array.isArray(payload.empresas) ? payload.empresas :
+              Array.isArray(payload.results) ? payload.results : []
+      };
     }
 
     function montarTabela(rows) {
       tabelaEl.innerHTML = '';
-      const head = document.createElement('thead');
+      if (!rows.length) return;
+
+      const thead = document.createElement('thead');
       const hr = document.createElement('tr');
-      ['ticker', 'name', 'industry', 'sector', 'city', 'state', 'website'].forEach(h => {
+      camposTabela.forEach((campo) => {
         const th = document.createElement('th');
-        th.textContent = h;
+        th.textContent = campo;
         hr.appendChild(th);
       });
-      head.appendChild(hr);
+      thead.appendChild(hr);
 
-      const body = document.createElement('tbody');
-      rows.forEach(r => {
+      const tbody = document.createElement('tbody');
+      rows.forEach((row) => {
         const tr = document.createElement('tr');
-        [
-          r.symbol,
-          r.summaryProfile?.name || '',
-          r.summaryProfile?.industry || '',
-          r.summaryProfile?.sector || '',
-          r.summaryProfile?.city || '',
-          r.summaryProfile?.state || '',
-          r.summaryProfile?.website || ''
-        ].forEach(v => {
+        camposTabela.forEach((campo) => {
           const td = document.createElement('td');
-          td.textContent = v;
+          td.textContent = row?.[campo] ?? row?.summaryProfile?.[campo] ?? row?.symbol ?? '';
           tr.appendChild(td);
         });
-        body.appendChild(tr);
+        tbody.appendChild(tr);
       });
 
-      tabelaEl.appendChild(head);
-      tabelaEl.appendChild(body);
+      tabelaEl.appendChild(thead);
+      tabelaEl.appendChild(tbody);
     }
 
     btnProcessar.addEventListener('click', async () => {
-      const token = TOKEN_BRAPI;
-      const tickersRaw = document.getElementById('tickers').value.trim();
+      const raw = tickersInput.value.trim();
+      if (!raw) {
+        alert('Informe pelo menos um ticker.');
+        return;
+      }
 
-      if (!token) return alert('TOKEN_BRAPI não configurado no servidor (.env).');
-      if (!tickersRaw) return alert('Informe pelo menos um ticker.');
-
-      const tickers = [...new Set(tickersRaw.split(',').map(t => t.trim().toUpperCase()).filter(Boolean))];
-      if (!tickers.length) return alert('Nenhum ticker válido encontrado.');
+      const tickers = [...new Set(raw.split(',').map((t) => t.trim().toUpperCase()).filter(Boolean))];
+      if (!tickers.length) {
+        alert('Nenhum ticker válido encontrado.');
+        return;
+      }
 
       const lotes = dividirEmLotes(tickers, MAX_POR_LOTE);
-      const todasRows = [];
+      const previewRows = [];
+
+      let concluidos = 0;
+      let salvos = 0;
+      let ignorados = 0;
+      let falhas = 0;
 
       resultado.hidden = true;
+      btnProcessar.disabled = true;
       modal.style.display = 'flex';
       atualizarModal(0, lotes.length, 0, tickers.length);
 
-      let concluido = 0;
-      let ignorados = 0;
-      let salvosBanco = 0;
-      let falhasLote = 0;
-
       try {
         for (const lote of lotes) {
-          const rows = await buscarLote(lote, token);
-          const validRows = [];
-
-          for (const row of rows) {
-            if (!row?.summaryProfile) {
-              ignorados++;
-              continue;
-            }
-
-            const profile = normalizarSummaryProfile(row.summaryProfile);
-            const normalizedRow = { symbol: row.symbol, summaryProfile: profile };
-            validRows.push(normalizedRow);
-            todasRows.push(normalizedRow);
+          try {
+            const resposta = await importarLote(lote);
+            salvos += resposta.salvos;
+            ignorados += resposta.ignorados;
+            previewRows.push(...resposta.rows);
+          } catch (error) {
+            falhas++;
           }
 
-          if (validRows.length) {
-            try {
-              await salvarLoteNoBanco(ENDPOINT_SALVAR, validRows);
-              salvosBanco += validRows.length;
-            } catch (err) {
-              falhasLote++;
-            }
-          }
-
-          concluido++;
-          atualizarModal(concluido, lotes.length, Math.min(concluido * MAX_POR_LOTE, tickers.length), tickers.length);
+          concluidos++;
+          atualizarModal(concluidos, lotes.length, Math.min(concluidos * MAX_POR_LOTE, tickers.length), tickers.length);
         }
 
-        statusEl.textContent = falhasLote ? 'Atualização concluída com alertas.' : 'Atualização concluída com sucesso.';
-        statusEl.className = falhasLote ? 'status warn' : 'status ok';
-        resumoEl.textContent = `Tickers informados: ${tickers.length}. Empresas com summaryProfile: ${todasRows.length}. Ignoradas (sem summaryProfile): ${ignorados}. Salvas no banco: ${salvosBanco}. Falhas em lotes: ${falhasLote}.`;
-        montarTabela(todasRows);
-      } catch (err) {
-        statusEl.textContent = `Falha: ${err.message}`;
+        statusEl.textContent = falhas ? 'Concluído com alertas.' : 'Concluído com sucesso.';
+        statusEl.className = falhas ? 'status warn' : 'status ok';
+        resumoEl.textContent = `Tickers informados: ${tickers.length}. Salvos no banco: ${salvos}. Ignorados: ${ignorados}. Lotes com falha: ${falhas}.`;
+        montarTabela(previewRows);
+      } catch (error) {
+        statusEl.textContent = `Falha geral: ${error.message}`;
         statusEl.className = 'status warn';
-        resumoEl.textContent = 'Revise token, conectividade, endpoint interno e símbolos enviados.';
+        resumoEl.textContent = 'Verifique o endpoint interno e as configurações DB_HOST/DB_NAME/DB_USER/DB_PASS/TOKEN_BRAPI no .env.';
       } finally {
         modal.style.display = 'none';
+        btnProcessar.disabled = false;
         resultado.hidden = false;
       }
     });
