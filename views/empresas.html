@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="token-brapi" content="{{ TOKEN_BRAPI }}" />
-  <title>Carga de Empresas (Brapi)</title>
+  <title>Atualização de Empresas (Brapi)</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -57,7 +57,7 @@
 
     label { font-weight: 700; }
 
-    textarea, input {
+    textarea {
       width: 100%;
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -88,12 +88,6 @@
       color: white;
     }
 
-    .ghost {
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--text);
-    }
-
     .hint {
       color: var(--muted);
       margin: 6px 0 0;
@@ -114,18 +108,6 @@
     .status.ok { color: var(--ok); }
     .status.warn { color: var(--warn); }
 
-    .inline {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 14px;
-    }
-
-    .inline input[type="checkbox"] {
-      width: auto;
-      margin: 0;
-    }
-
     table {
       width: 100%;
       border-collapse: collapse;
@@ -142,17 +124,6 @@
 
     code {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    }
-
-    .sql-box {
-      margin-top: 12px;
-      max-height: 220px;
-      overflow: auto;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px;
-      white-space: pre;
-      font-size: 12px;
     }
 
     .modal-overlay {
@@ -192,42 +163,29 @@
 </head>
 <body>
   <main class="container">
-    <h1>Preencher empresas via Brapi (summaryProfile)</h1>
-    <p class="hint">A tela usa apenas atributos de <code>results[].summaryProfile</code> e processa até 20 tickers por lote.</p>
+    <h1>Atualizar cadastro de empresas</h1>
+    <p class="hint">Informe os tickers e o sistema atualiza automaticamente o banco usando apenas <code>results[].summaryProfile</code>.</p>
 
     <div class="grid">
-      <p class="hint">Token carregado do servidor (variável <code>TOKEN_BRAPI</code> do arquivo <code>.env</code>).</p>
-
       <label for="tickers">Tickers (separados por vírgula, sem espaço)</label>
       <textarea id="tickers" rows="4" placeholder="LEVE3,WIZC3,CXSE3,BRSR6"></textarea>
-      <p class="hint">Exemplo de endpoint por lote: <code>https://brapi.dev/api/quote/MGLU3,PETR4?modules=summaryProfile&amp;token=SEU_TOKEN</code></p>
-
-      <label class="inline" for="salvarBanco">
-        <input type="checkbox" id="salvarBanco" checked />
-        Tentar salvar no banco via endpoint interno
-      </label>
-
-      <label for="endpointSalvar">Endpoint interno para persistir no banco</label>
-      <input id="endpointSalvar" value="/api/empresas/summary-profile/import" />
-      <p class="hint">Payload enviado por lote: <code>{ empresas: [{ ticker, summaryProfile }] }</code>. Se o endpoint não existir, o SQL continua sendo gerado para execução manual.</p>
+      <p class="hint">Até 20 empresas por requisição. Se passar disso, será feito automaticamente em lotes.</p>
 
       <div class="actions">
-        <button class="primary" id="btnProcessar">Buscar e processar</button>
-        <button class="ghost" id="btnCopiar" disabled>Copiar SQL</button>
+        <button class="primary" id="btnProcessar">Atualizar empresas</button>
       </div>
     </div>
 
     <section class="result" id="resultado" hidden>
       <div class="status" id="status"></div>
       <div class="hint" id="resumo"></div>
-      <div class="sql-box" id="sql"></div>
       <table id="tabela"></table>
     </section>
   </main>
 
   <div class="modal-overlay" id="modal">
     <div class="modal">
-      <h3>Processando lotes</h3>
+      <h3>Atualizando empresas</h3>
       <p id="modalText">Iniciando...</p>
       <div class="progress"><div id="bar"></div></div>
     </div>
@@ -235,6 +193,7 @@
 
   <script>
     const MAX_POR_LOTE = 20;
+    const ENDPOINT_SALVAR = '/api/empresas/summary-profile/import';
     const CAMPOS = [
       'address1','address2','address3','city','state','zip','country','phone','fax','website',
       'industry','industryKey','industryDisp','sector','sectorKey','sectorDisp','longBusinessSummary',
@@ -242,19 +201,14 @@
     ];
 
     const btnProcessar = document.getElementById('btnProcessar');
-    const btnCopiar = document.getElementById('btnCopiar');
-
     const resultado = document.getElementById('resultado');
     const statusEl = document.getElementById('status');
     const resumoEl = document.getElementById('resumo');
-    const sqlEl = document.getElementById('sql');
     const tabelaEl = document.getElementById('tabela');
 
     const modal = document.getElementById('modal');
     const modalText = document.getElementById('modalText');
     const bar = document.getElementById('bar');
-    let sqlGerado = '';
-
     const tokenMeta = document.querySelector('meta[name="token-brapi"]');
     const TOKEN_BRAPI = (tokenMeta?.content || '').trim();
 
@@ -266,13 +220,6 @@
       return lotes;
     }
 
-    function escapeSql(valor) {
-      if (valor === null || valor === undefined || valor === '') return 'NULL';
-      if (typeof valor === 'number') return String(valor);
-      if (typeof valor === 'object') return `'${JSON.stringify(valor).replace(/'/g, "''")}'`;
-      return `'${String(valor).replace(/'/g, "''")}'`;
-    }
-
     function normalizarSummaryProfile(profile) {
       const normalized = {};
       for (const campo of CAMPOS) {
@@ -281,20 +228,8 @@
       return normalized;
     }
 
-    function montarUpsert(symbol, profile) {
-      const colunas = ['ticker', ...CAMPOS].map(col => `\`${col}\``);
-      const valores = [escapeSql(symbol.toUpperCase())];
-
-      for (const campo of CAMPOS) {
-        valores.push(escapeSql(profile?.[campo] ?? null));
-      }
-
-      const updates = CAMPOS.map(c => `\`${c}\`=VALUES(\`${c}\`)`).join(', ');
-      return `INSERT INTO empresas (${colunas.join(', ')}) VALUES (${valores.join(', ')}) ON DUPLICATE KEY UPDATE ${updates};`;
-    }
-
     function atualizarModal(concluidos, total, empresasFeitas, empresasTotal) {
-      const pendentes = total - concluidos;
+      const pendentes = Math.max(total - concluidos, 0);
       const pct = total === 0 ? 0 : Math.round((concluidos / total) * 100);
       modalText.textContent = `Lotes: ${concluidos}/${total} • Restantes: ${pendentes} • Empresas processadas: ${empresasFeitas}/${empresasTotal}`;
       bar.style.width = `${pct}%`;
@@ -367,20 +302,16 @@
 
     btnProcessar.addEventListener('click', async () => {
       const token = TOKEN_BRAPI;
-      const salvarBanco = document.getElementById('salvarBanco').checked;
-      const endpointSalvar = document.getElementById('endpointSalvar').value.trim();
       const tickersRaw = document.getElementById('tickers').value.trim();
 
       if (!token) return alert('TOKEN_BRAPI não configurado no servidor (.env).');
       if (!tickersRaw) return alert('Informe pelo menos um ticker.');
-      if (salvarBanco && !endpointSalvar) return alert('Informe o endpoint de persistência para salvar no banco.');
 
       const tickers = [...new Set(tickersRaw.split(',').map(t => t.trim().toUpperCase()).filter(Boolean))];
       if (!tickers.length) return alert('Nenhum ticker válido encontrado.');
 
       const lotes = dividirEmLotes(tickers, MAX_POR_LOTE);
       const todasRows = [];
-      sqlGerado = '';
 
       resultado.hidden = true;
       modal.style.display = 'flex';
@@ -389,7 +320,7 @@
       let concluido = 0;
       let ignorados = 0;
       let salvosBanco = 0;
-      let erroSalvarBanco = '';
+      let falhasLote = 0;
 
       try {
         for (const lote of lotes) {
@@ -406,15 +337,14 @@
             const normalizedRow = { symbol: row.symbol, summaryProfile: profile };
             validRows.push(normalizedRow);
             todasRows.push(normalizedRow);
-            sqlGerado += `${montarUpsert(row.symbol, profile)}\n`;
           }
 
-          if (salvarBanco && validRows.length) {
+          if (validRows.length) {
             try {
-              await salvarLoteNoBanco(endpointSalvar, validRows);
+              await salvarLoteNoBanco(ENDPOINT_SALVAR, validRows);
               salvosBanco += validRows.length;
             } catch (err) {
-              erroSalvarBanco = err.message;
+              falhasLote++;
             }
           }
 
@@ -422,35 +352,18 @@
           atualizarModal(concluido, lotes.length, Math.min(concluido * MAX_POR_LOTE, tickers.length), tickers.length);
         }
 
-        const msgSalvar = salvarBanco
-          ? (erroSalvarBanco
-              ? ` Salvamento no banco falhou: ${erroSalvarBanco}`
-              : ` ${salvosBanco} empresa(s) enviada(s) para persistência no banco.`)
-          : ' Salvamento no banco desativado.';
-
-        statusEl.textContent = 'Processamento concluído.';
-        statusEl.className = erroSalvarBanco ? 'status warn' : 'status ok';
-        resumoEl.textContent = `Tickers informados: ${tickers.length}. Empresas com summaryProfile: ${todasRows.length}. Ignoradas (sem summaryProfile): ${ignorados}.${msgSalvar}`;
-        sqlEl.textContent = sqlGerado || '-- Nenhum SQL gerado.';
+        statusEl.textContent = falhasLote ? 'Atualização concluída com alertas.' : 'Atualização concluída com sucesso.';
+        statusEl.className = falhasLote ? 'status warn' : 'status ok';
+        resumoEl.textContent = `Tickers informados: ${tickers.length}. Empresas com summaryProfile: ${todasRows.length}. Ignoradas (sem summaryProfile): ${ignorados}. Salvas no banco: ${salvosBanco}. Falhas em lotes: ${falhasLote}.`;
         montarTabela(todasRows);
-        btnCopiar.disabled = !sqlGerado;
       } catch (err) {
         statusEl.textContent = `Falha: ${err.message}`;
         statusEl.className = 'status warn';
-        resumoEl.textContent = 'Revise token, conectividade e símbolos enviados.';
-        sqlEl.textContent = sqlGerado || '-- Sem SQL por falha na requisição.';
-        btnCopiar.disabled = !sqlGerado;
+        resumoEl.textContent = 'Revise token, conectividade, endpoint interno e símbolos enviados.';
       } finally {
         modal.style.display = 'none';
         resultado.hidden = false;
       }
-    });
-
-    btnCopiar.addEventListener('click', async () => {
-      if (!sqlGerado) return;
-      await navigator.clipboard.writeText(sqlGerado);
-      btnCopiar.textContent = 'SQL copiado!';
-      setTimeout(() => (btnCopiar.textContent = 'Copiar SQL'), 1300);
     });
   </script>
 </body>
