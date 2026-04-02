@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="token-brapi" content="{{ TOKEN_BRAPI }}" />
   <title>Carga de Empresas (Brapi)</title>
   <style>
     :root {
@@ -183,9 +184,7 @@
     <p class="hint">Esta tela usa apenas atributos de <code>results[].summaryProfile</code> e processa até 20 tickers por lote.</p>
 
     <div class="grid">
-      <label for="token">TOKEN_BRAPI</label>
-      <input id="token" type="password" placeholder="Informe seu token" />
-      <p class="hint">Obs.: este campo existe porque esta página roda no navegador e não consegue ler variáveis do arquivo <code>.env</code> do servidor.</p>
+      <p class="hint">Token carregado do servidor (variável <code>TOKEN_BRAPI</code> do arquivo <code>.env</code>).</p>
 
       <label for="tickers">Tickers (separados por vírgula, sem espaço)</label>
       <textarea id="tickers" rows="4" placeholder="LEVE3,WIZC3,CXSE3,BRSR6"></textarea>
@@ -233,11 +232,10 @@
     const modal = document.getElementById('modal');
     const modalText = document.getElementById('modalText');
     const bar = document.getElementById('bar');
-    const tokenInput = document.getElementById('token');
-
     let sqlGerado = '';
 
-    tokenInput.value = localStorage.getItem('TOKEN_BRAPI') || '';
+    const tokenMeta = document.querySelector('meta[name="token-brapi"]');
+    const TOKEN_BRAPI = (tokenMeta?.content || "").trim();
 
     function dividirEmLotes(arr, tamanho) {
       const lotes = [];
@@ -319,13 +317,12 @@
     }
 
     btnProcessar.addEventListener('click', async () => {
-      const token = tokenInput.value.trim();
+      const token = TOKEN_BRAPI;
       const tickersRaw = document.getElementById('tickers').value.trim();
 
-      if (!token) return alert('Informe o TOKEN_BRAPI.');
+      if (!token) return alert('TOKEN_BRAPI não configurado no servidor (.env).');
       if (!tickersRaw) return alert('Informe pelo menos um ticker.');
 
-      localStorage.setItem('TOKEN_BRAPI', token);
 
       const tickers = [...new Set(tickersRaw.split(',').map(t => t.trim().toUpperCase()).filter(Boolean))];
       if (!tickers.length) return alert('Nenhum ticker válido encontrado.');
