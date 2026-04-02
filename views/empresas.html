@@ -55,16 +55,19 @@
       font-weight: 700;
     }
 
-    textarea {
+    textarea, input {
       width: 100%;
-      min-height: 120px;
       border: 1px solid var(--border);
       border-radius: 10px;
       padding: 12px;
       font-size: 15px;
-      resize: vertical;
       color: inherit;
       background: transparent;
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
     }
 
     .hint {
@@ -161,15 +164,18 @@
 <body>
   <main class="container">
     <h1>Atualizar empresas</h1>
-    <p class="subtitle">Digite os tickers separados por vírgula. O sistema busca na Brapi e já grava no MySQL automaticamente.</p>
+    <p class="subtitle">Busca diretamente na Brapi (quote + summaryProfile) e envia o JSON para persistência no backend.</p>
 
-    <label for="tickers">Tickers</label>
+    <label for="token">Token da Brapi (obrigatório para todas as ações)</label>
+    <input id="token" type="password" autocomplete="off" placeholder="Cole aqui seu token da Brapi" />
+
+    <label for="tickers" style="margin-top: 12px;">Tickers</label>
     <textarea id="tickers" placeholder="LEVE3,WIZC3,CXSE3,BRSR6"></textarea>
-    <p class="hint">Limite da Brapi: 20 por requisição. Acima disso, o sistema envia em lotes sem você se preocupar.</p>
+    <p class="hint">Limite da Brapi: 20 por requisição. Acima disso, o sistema envia em lotes automaticamente.</p>
 
     <div class="actions">
       <button id="btnProcessar">Atualizar agora</button>
-      <span class="hint">Sem etapa manual de “salvar no banco”.</span>
+      <span class="hint">Sem uso de endpoint /import.</span>
     </div>
 
     <section class="result" id="resultado" hidden>
@@ -181,7 +187,7 @@
 
   <div class="modal-overlay" id="modal">
     <div class="modal">
-      <h3>Processando importação</h3>
+      <h3>Processando empresas</h3>
       <p id="modalText">Iniciando...</p>
       <div class="progress"><div id="bar"></div></div>
     </div>
@@ -189,12 +195,11 @@
 
   <script>
     const MAX_POR_LOTE = 20;
-    const ENDPOINTS_IMPORTAR = [
-      '/api/empresas/summary-profile/import',
-      '/api/empresas/summaryProfile/import'
-    ];
+    const BRAPI_BASE_URL = 'https://brapi.dev/api/quote';
+    const ENDPOINTS_SALVAR = ['/api/empresas', '/api/empresas/sync'];
 
     const btnProcessar = document.getElementById('btnProcessar');
+    const tokenInput = document.getElementById('token');
     const tickersInput = document.getElementById('tickers');
     const resultado = document.getElementById('resultado');
     const statusEl = document.getElementById('status');
@@ -222,31 +227,60 @@
       bar.style.width = `${pct}%`;
     }
 
-    async function importarLote(tickersLote) {
+    async function buscarNaBrapi(tickersLote, token) {
+      const tickersCsv = encodeURIComponent(tickersLote.join(','));
+      const query = new URLSearchParams({ modules: 'summaryProfile', token });
+      const url = `${BRAPI_BASE_URL}/${tickersCsv}?${query.toString()}`;
+
+      const resp = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      const payload = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        throw new Error(payload.message || `Falha na Brapi (${resp.status}).`);
+      }
+
+      return Array.isArray(payload.results) ? payload.results : [];
+    }
+
+    async function salvarNoBanco(results, token) {
       let ultimaFalha = null;
 
-      for (const endpoint of ENDPOINTS_IMPORTAR) {
+      for (const endpoint of ENDPOINTS_SALVAR) {
         const resp = await fetch(endpoint, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tickers: tickersLote })
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ results })
         });
 
         const payload = await resp.json().catch(() => ({}));
         if (resp.ok) {
           return {
-            salvos: Number(payload.salvos ?? payload.saved ?? tickersLote.length),
+            salvos: Number(payload.salvos ?? payload.saved ?? results.length),
             ignorados: Number(payload.ignorados ?? payload.skipped ?? 0),
             rows: Array.isArray(payload.empresas) ? payload.empresas :
-                  Array.isArray(payload.results) ? payload.results : []
+                  Array.isArray(payload.results) ? payload.results : results
           };
         }
 
-        ultimaFalha = payload.message || `Falha ao importar lote (${resp.status}).`;
+        ultimaFalha = payload.message || `Falha ao salvar no endpoint ${endpoint} (${resp.status}).`;
         if (resp.status !== 404) break;
       }
 
-      throw new Error(ultimaFalha || 'Falha ao importar lote.');
+      throw new Error(ultimaFalha || 'Falha ao salvar dados no backend.');
+    }
+
+    async function processarLote(tickersLote, token) {
+      const results = await buscarNaBrapi(tickersLote, token);
+      return salvarNoBanco(results, token);
     }
 
     function montarTabela(rows) {
@@ -278,6 +312,12 @@
     }
 
     btnProcessar.addEventListener('click', async () => {
+      const token = tokenInput.value.trim();
+      if (!token) {
+        alert('Informe o token da Brapi.');
+        return;
+      }
+
       const raw = tickersInput.value.trim();
       if (!raw) {
         alert('Informe pelo menos um ticker.');
@@ -306,7 +346,7 @@
       try {
         for (const lote of lotes) {
           try {
-            const resposta = await importarLote(lote);
+            const resposta = await processarLote(lote, token);
             salvos += resposta.salvos;
             ignorados += resposta.ignorados;
             previewRows.push(...resposta.rows);
@@ -325,7 +365,7 @@
       } catch (error) {
         statusEl.textContent = `Falha geral: ${error.message}`;
         statusEl.className = 'status warn';
-        resumoEl.textContent = 'Verifique o endpoint interno e as configurações DB_HOST/DB_NAME/DB_USER/DB_PASS/TOKEN_BRAPI no .env.';
+        resumoEl.textContent = 'Verifique token da Brapi, conectividade com https://brapi.dev/api/quote e endpoint local /api/empresas.';
       } finally {
         modal.style.display = 'none';
         btnProcessar.disabled = false;
