@@ -189,7 +189,10 @@
 
   <script>
     const MAX_POR_LOTE = 20;
-    const ENDPOINT_IMPORTAR = '/api/empresas/summary-profile/import';
+    const ENDPOINTS_IMPORTAR = [
+      '/api/empresas/summary-profile/import',
+      '/api/empresas/summaryProfile/import'
+    ];
 
     const btnProcessar = document.getElementById('btnProcessar');
     const tickersInput = document.getElementById('tickers');
@@ -220,23 +223,30 @@
     }
 
     async function importarLote(tickersLote) {
-      const resp = await fetch(ENDPOINT_IMPORTAR, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tickers: tickersLote })
-      });
+      let ultimaFalha = null;
 
-      const payload = await resp.json().catch(() => ({}));
-      if (!resp.ok) {
-        throw new Error(payload.message || `Falha ao importar lote (${resp.status}).`);
+      for (const endpoint of ENDPOINTS_IMPORTAR) {
+        const resp = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tickers: tickersLote })
+        });
+
+        const payload = await resp.json().catch(() => ({}));
+        if (resp.ok) {
+          return {
+            salvos: Number(payload.salvos ?? payload.saved ?? tickersLote.length),
+            ignorados: Number(payload.ignorados ?? payload.skipped ?? 0),
+            rows: Array.isArray(payload.empresas) ? payload.empresas :
+                  Array.isArray(payload.results) ? payload.results : []
+          };
+        }
+
+        ultimaFalha = payload.message || `Falha ao importar lote (${resp.status}).`;
+        if (resp.status !== 404) break;
       }
 
-      return {
-        salvos: Number(payload.salvos ?? payload.saved ?? tickersLote.length),
-        ignorados: Number(payload.ignorados ?? payload.skipped ?? 0),
-        rows: Array.isArray(payload.empresas) ? payload.empresas :
-              Array.isArray(payload.results) ? payload.results : []
-      };
+      throw new Error(ultimaFalha || 'Falha ao importar lote.');
     }
 
     function montarTabela(rows) {
