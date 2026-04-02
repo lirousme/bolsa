@@ -185,10 +185,7 @@
       });
 
       const payload = await resp.json().catch(() => ({}));
-      console.log('Resposta da API /api/empresas.php:', payload);
-
       if (!resp.ok) {
-        console.error('Erro da API /api/empresas.php:', payload);
         throw new Error(payload.message || `Falha ao salvar lote (${resp.status}).`);
       }
 
