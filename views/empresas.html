@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Carga de Empresas (Brapi)</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f4f6fb;
+      --card: #ffffff;
+      --text: #14213d;
+      --muted: #475569;
+      --accent: #2563eb;
+      --ok: #16a34a;
+      --warn: #d97706;
+      --border: #dbe3ef;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f172a;
+        --card: #111827;
+        --text: #e5e7eb;
+        --muted: #9ca3af;
+        --accent: #60a5fa;
+        --ok: #34d399;
+        --warn: #f59e0b;
+        --border: #334155;
+      }
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .container {
+      max-width: 980px;
+      margin: 32px auto;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+    }
+
+    h1 { margin-top: 0; }
+
+    .grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    label { font-weight: 700; }
+
+    textarea, input {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 14px;
+      box-sizing: border-box;
+      background: transparent;
+      color: inherit;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .primary {
+      background: var(--accent);
+      color: white;
+    }
+
+    .ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .hint {
+      color: var(--muted);
+      margin: 6px 0 0;
+      font-size: 13px;
+    }
+
+    .result {
+      margin-top: 20px;
+      border-top: 1px solid var(--border);
+      padding-top: 16px;
+    }
+
+    .status {
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .status.ok { color: var(--ok); }
+    .status.warn { color: var(--warn); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 13px;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .sql-box {
+      margin-top: 12px;
+      max-height: 220px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      white-space: pre;
+      font-size: 12px;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal {
+      width: min(500px, 100%);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+    }
+
+    .progress {
+      width: 100%;
+      height: 12px;
+      border-radius: 999px;
+      background: rgba(100,100,100,.25);
+      overflow: hidden;
+      margin-top: 10px;
+    }
+
+    .progress > div {
+      height: 100%;
+      width: 0;
+      background: var(--accent);
+      transition: width .2s ease;
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <h1>Preencher empresas via Brapi (summaryProfile)</h1>
+    <p class="hint">Esta tela usa apenas atributos de <code>results[].summaryProfile</code> e processa até 20 tickers por lote.</p>
+
+    <div class="grid">
+      <label for="tickers">Tickers (separados por vírgula, sem espaço)</label>
+      <textarea id="tickers" rows="4" placeholder="LEVE3,WIZC3,CXSE3,BRSR6"></textarea>
+      <p class="hint">O token é lido do <code>.env</code> no backend (<code>TOKEN_BRAPI</code>). Esta tela chama apenas o proxy local.</p>
+
+      <div class="actions">
+        <button class="primary" id="btnProcessar">Buscar e gerar SQL</button>
+        <button class="ghost" id="btnCopiar" disabled>Copiar SQL</button>
+      </div>
+    </div>
+
+    <section class="result" id="resultado" hidden>
+      <div class="status" id="status"></div>
+      <div class="hint" id="resumo"></div>
+      <div class="sql-box" id="sql"></div>
+      <table id="tabela"></table>
+    </section>
+  </main>
+
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <h3>Processando lotes</h3>
+      <p id="modalText">Iniciando...</p>
+      <div class="progress"><div id="bar"></div></div>
+    </div>
+  </div>
+
+  <script>
+    const MAX_POR_LOTE = 20;
+    const CAMPOS = [
+      'address1','address2','address3','city','state','zip','country','phone','fax','website',
+      'industry','industryKey','industryDisp','sector','sectorKey','sectorDisp','longBusinessSummary',
+      'fullTimeEmployees','companyOfficers','twitter','name','startDate','description','logoUrl','cnpj'
+    ];
+
+    const btnProcessar = document.getElementById('btnProcessar');
+    const btnCopiar = document.getElementById('btnCopiar');
+
+    const resultado = document.getElementById('resultado');
+    const statusEl = document.getElementById('status');
+    const resumoEl = document.getElementById('resumo');
+    const sqlEl = document.getElementById('sql');
+    const tabelaEl = document.getElementById('tabela');
+
+    const modal = document.getElementById('modal');
+    const modalText = document.getElementById('modalText');
+    const bar = document.getElementById('bar');
+
+    let sqlGerado = '';
+
+    function dividirEmLotes(arr, tamanho) {
+      const lotes = [];
+      for (let i = 0; i < arr.length; i += tamanho) {
+        lotes.push(arr.slice(i, i + tamanho));
+      }
+      return lotes;
+    }
+
+    function escapeSql(valor) {
+      if (valor === null || valor === undefined || valor === '') return 'NULL';
+      if (typeof valor === 'number') return String(valor);
+      if (typeof valor === 'object') return `'${JSON.stringify(valor).replace(/'/g, "''")}'`;
+      return `'${String(valor).replace(/'/g, "''")}'`;
+    }
+
+    function montarUpsert(symbol, profile) {
+      const colunas = ['ticker', ...CAMPOS];
+      const valores = [escapeSql(symbol.toUpperCase())];
+
+      for (const campo of CAMPOS) {
+        valores.push(escapeSql(profile?.[campo] ?? null));
+      }
+
+      const updates = CAMPOS.map(c => `${c}=VALUES(${c})`).join(', ');
+      return `INSERT INTO empresas (${colunas.join(', ')}) VALUES (${valores.join(', ')}) ON DUPLICATE KEY UPDATE ${updates};`;
+    }
+
+    function atualizarModal(concluidos, total) {
+      const pendentes = total - concluidos;
+      const pct = total === 0 ? 0 : Math.round((concluidos / total) * 100);
+      modalText.textContent = `Lotes concluídos: ${concluidos}/${total} • Restantes: ${pendentes}`;
+      bar.style.width = `${pct}%`;
+    }
+
+    async function buscarLote(tickers) {
+      const endpoint = `/api/brapi/quote/${tickers.join(',')}?modules=summaryProfile`;
+      const resp = await fetch(endpoint);
+      if (!resp.ok) {
+        const texto = await resp.text();
+        throw new Error(`Erro HTTP ${resp.status}: ${texto || 'sem detalhe'}`);
+      }
+      const data = await resp.json();
+      return data.results || [];
+    }
+
+    function montarTabela(rows) {
+      tabelaEl.innerHTML = '';
+      const head = document.createElement('thead');
+      const hr = document.createElement('tr');
+      ['ticker', 'name', 'industry', 'sector', 'city', 'state', 'website'].forEach(h => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        hr.appendChild(th);
+      });
+      head.appendChild(hr);
+
+      const body = document.createElement('tbody');
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        [
+          r.symbol,
+          r.summaryProfile?.name || '',
+          r.summaryProfile?.industry || '',
+          r.summaryProfile?.sector || '',
+          r.summaryProfile?.city || '',
+          r.summaryProfile?.state || '',
+          r.summaryProfile?.website || ''
+        ].forEach(v => {
+          const td = document.createElement('td');
+          td.textContent = v;
+          tr.appendChild(td);
+        });
+        body.appendChild(tr);
+      });
+
+      tabelaEl.appendChild(head);
+      tabelaEl.appendChild(body);
+    }
+
+    btnProcessar.addEventListener('click', async () => {
+      const tickersRaw = document.getElementById('tickers').value.trim();
+
+      if (!tickersRaw) return alert('Informe pelo menos um ticker.');
+
+      const tickers = [...new Set(tickersRaw.split(',').map(t => t.trim().toUpperCase()).filter(Boolean))];
+      if (!tickers.length) return alert('Nenhum ticker válido encontrado.');
+
+      const lotes = dividirEmLotes(tickers, MAX_POR_LOTE);
+      const todasRows = [];
+      sqlGerado = '';
+
+      resultado.hidden = true;
+      modal.style.display = 'flex';
+      atualizarModal(0, lotes.length);
+
+      let concluido = 0;
+      let ignorados = 0;
+
+      try {
+        for (const lote of lotes) {
+          const rows = await buscarLote(lote);
+          for (const row of rows) {
+            if (!row?.summaryProfile) {
+              ignorados++;
+              continue;
+            }
+            todasRows.push(row);
+            sqlGerado += `${montarUpsert(row.symbol, row.summaryProfile)}\n`;
+          }
+          concluido++;
+          atualizarModal(concluido, lotes.length);
+        }
+
+        statusEl.textContent = 'Processamento concluído.';
+        statusEl.className = 'status ok';
+        resumoEl.textContent = `Tickers informados: ${tickers.length}. Empresas com summaryProfile: ${todasRows.length}. Ignoradas (sem summaryProfile): ${ignorados}.`;
+        sqlEl.textContent = sqlGerado || '-- Nenhum SQL gerado.';
+        montarTabela(todasRows);
+        btnCopiar.disabled = !sqlGerado;
+      } catch (err) {
+        statusEl.textContent = `Falha: ${err.message}`;
+        statusEl.className = 'status warn';
+        resumoEl.textContent = 'Revise conectividade, endpoint proxy (/api/brapi/quote/...) e símbolos enviados.';
+        sqlEl.textContent = sqlGerado || '-- Sem SQL por falha na requisição.';
+        btnCopiar.disabled = !sqlGerado;
+      } finally {
+        modal.style.display = 'none';
+        resultado.hidden = false;
+      }
+    });
+
+    btnCopiar.addEventListener('click', async () => {
+      if (!sqlGerado) return;
+      await navigator.clipboard.writeText(sqlGerado);
+      btnCopiar.textContent = 'SQL copiado!';
+      setTimeout(() => (btnCopiar.textContent = 'Copiar SQL'), 1300);
+    });
+  </script>
+</body>
+</html>
