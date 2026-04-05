@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>End points</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class'
+        };
+    </script>
+</head>
+<body class="bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-100 min-h-screen p-6">
+    <main class="mx-auto max-w-5xl rounded-2xl bg-white/90 p-6 shadow-xl ring-1 ring-slate-200 backdrop-blur dark:bg-slate-900/90 dark:ring-slate-800">
+        <header class="mb-6 flex items-center justify-between gap-4">
+            <div>
+                <a href="./perfil_da_empresas.html" id="linkVoltar" class="text-sm text-blue-600 hover:underline dark:text-blue-300">← Voltar para perfil</a>
+                <h1 class="mt-2 text-2xl font-bold md:text-3xl">End points</h1>
+                <p id="contextoTicker" class="mt-1 text-sm text-slate-600 dark:text-slate-300"></p>
+            </div>
+            <button
+                class="h-11 w-11 rounded-full bg-blue-600 text-3xl leading-none text-white transition hover:bg-blue-500"
+                id="abrirModalEndPoint"
+                title="Adicionar end point"
+                type="button"
+            >+</button>
+        </header>
+
+        <div id="mensagem" class="mb-4 hidden rounded-lg p-3 text-sm"></div>
+
+        <section id="listaEndPoints" class="space-y-3">
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                Carregando end points...
+            </div>
+        </section>
+    </main>
+
+    <div class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/70 p-4" id="modalEndPointFundo">
+        <div class="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+            <h2 class="mb-4 text-xl font-semibold">Novo end point</h2>
+
+            <label for="nomeInput" class="text-sm text-slate-600 dark:text-slate-300">Nome</label>
+            <input
+                class="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-800"
+                id="nomeInput"
+                type="text"
+                placeholder="Ex: valueAddedHistoryQuarterly"
+                autocomplete="off"
+            />
+
+            <label for="estruturaInput" class="mt-4 block text-sm text-slate-600 dark:text-slate-300">Estrutura da resposta (JSON de exemplo)</label>
+            <textarea
+                class="mt-2 h-40 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-800"
+                id="estruturaInput"
+                placeholder='Ex: {"campo": [{"subcampo": "valor"}]}'
+            ></textarea>
+
+            <label for="caminhoInput" class="mt-4 block text-sm text-slate-600 dark:text-slate-300">Caminho da API</label>
+            <input
+                class="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-800"
+                id="caminhoInput"
+                type="text"
+                placeholder="Ex: \api\modulo_valueAddedHistoryQuarterly_trimestre.php"
+                autocomplete="off"
+            />
+
+            <div class="mt-6 flex justify-end gap-2">
+                <button class="rounded-lg bg-slate-200 px-4 py-2 text-slate-800 transition hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600" id="fecharModalEndPoint" type="button">Cancelar</button>
+                <button class="rounded-lg bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-500" id="salvarEndPoint" type="button">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const parametros = new URLSearchParams(window.location.search);
+        const idEmpresa = Number.parseInt(parametros.get('id_empresa'), 10);
+        const ticker = parametros.get('ticker') || '';
+
+        const contextoTicker = document.getElementById('contextoTicker');
+        const linkVoltar = document.getElementById('linkVoltar');
+        const listaEndPoints = document.getElementById('listaEndPoints');
+        const mensagem = document.getElementById('mensagem');
+        const modalEndPointFundo = document.getElementById('modalEndPointFundo');
+
+        const nomeInput = document.getElementById('nomeInput');
+        const estruturaInput = document.getElementById('estruturaInput');
+        const caminhoInput = document.getElementById('caminhoInput');
+
+        if (Number.isInteger(idEmpresa) && idEmpresa > 0) {
+            linkVoltar.href = `./perfil_da_empresas.html?id=${idEmpresa}`;
+        }
+
+        contextoTicker.textContent = ticker
+            ? `Ticker selecionado: ${ticker}`
+            : 'Ticker não informado. Exibindo lista global de end points.';
+
+        function mostrarMensagem(texto, tipo) {
+            mensagem.textContent = texto;
+            mensagem.className = 'mb-4 rounded-lg p-3 text-sm';
+
+            if (tipo === 'sucesso') {
+                mensagem.classList.add('bg-emerald-100', 'text-emerald-900', 'dark:bg-emerald-950', 'dark:text-emerald-200');
+            } else {
+                mensagem.classList.add('bg-red-100', 'text-red-900', 'dark:bg-red-950', 'dark:text-red-200');
+            }
+
+            mensagem.classList.remove('hidden');
+        }
+
+        function ocultarMensagem() {
+            mensagem.classList.add('hidden');
+        }
+
+        function renderizarEndPoints(endPoints) {
+            if (!Array.isArray(endPoints) || endPoints.length === 0) {
+                listaEndPoints.innerHTML = `
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        Nenhum end point cadastrado.
+                    </div>
+                `;
+                return;
+            }
+
+            listaEndPoints.innerHTML = endPoints
+                .map((item) => `
+                    <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                        <div class="flex items-start justify-between gap-3">
+                            <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100">${item.nome}</h2>
+                            <span class="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700 dark:bg-slate-700 dark:text-slate-200">#${item.id}</span>
+                        </div>
+                        <p class="mt-2 text-sm font-medium text-slate-700 dark:text-slate-300">Caminho:</p>
+                        <code class="block overflow-x-auto rounded-md bg-slate-100 px-3 py-2 text-xs text-slate-800 dark:bg-slate-950 dark:text-slate-200">${item.caminho}</code>
+                        <p class="mt-3 text-sm font-medium text-slate-700 dark:text-slate-300">Estrutura da resposta:</p>
+                        <pre class="mt-1 overflow-x-auto rounded-md bg-slate-100 px-3 py-2 text-xs text-slate-800 dark:bg-slate-950 dark:text-slate-200">${item.estrutura_da_resposta}</pre>
+                    </article>
+                `)
+                .join('');
+        }
+
+        async function carregarEndPoints() {
+            ocultarMensagem();
+
+            try {
+                const resposta = await fetch('../empresas/gerenciar_end_points.php');
+                const dados = await resposta.json();
+
+                if (!resposta.ok) {
+                    throw new Error(dados.erro || 'Falha ao carregar end points.');
+                }
+
+                renderizarEndPoints(dados.end_points);
+            } catch (erro) {
+                listaEndPoints.innerHTML = `
+                    <div class="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
+                        Não foi possível carregar os end points.
+                    </div>
+                `;
+                mostrarMensagem(erro.message, 'erro');
+            }
+        }
+
+        async function cadastrarEndPoint() {
+            ocultarMensagem();
+
+            const nome = nomeInput.value.trim();
+            const estruturaDaResposta = estruturaInput.value.trim();
+            const caminho = caminhoInput.value.trim();
+
+            if (!nome) {
+                mostrarMensagem('Informe o nome do end point.', 'erro');
+                return;
+            }
+
+            if (!estruturaDaResposta) {
+                mostrarMensagem('Informe a estrutura da resposta.', 'erro');
+                return;
+            }
+
+            if (!caminho) {
+                mostrarMensagem('Informe o caminho da API.', 'erro');
+                return;
+            }
+
+            try {
+                const resposta = await fetch('../empresas/gerenciar_end_points.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        nome,
+                        estrutura_da_resposta: estruturaDaResposta,
+                        caminho
+                    })
+                });
+
+                const dados = await resposta.json();
+
+                if (!resposta.ok) {
+                    throw new Error(dados.erro || 'Falha ao cadastrar end point.');
+                }
+
+                nomeInput.value = '';
+                estruturaInput.value = '';
+                caminhoInput.value = '';
+                modalEndPointFundo.classList.remove('flex');
+                modalEndPointFundo.classList.add('hidden');
+                mostrarMensagem(dados.mensagem || 'End point cadastrado com sucesso.', 'sucesso');
+                await carregarEndPoints();
+            } catch (erro) {
+                mostrarMensagem(erro.message, 'erro');
+            }
+        }
+
+        document.getElementById('abrirModalEndPoint').addEventListener('click', () => {
+            modalEndPointFundo.classList.remove('hidden');
+            modalEndPointFundo.classList.add('flex');
+            nomeInput.focus();
+        });
+
+        document.getElementById('fecharModalEndPoint').addEventListener('click', () => {
+            modalEndPointFundo.classList.remove('flex');
+            modalEndPointFundo.classList.add('hidden');
+        });
+
+        document.getElementById('salvarEndPoint').addEventListener('click', cadastrarEndPoint);
+
+        modalEndPointFundo.addEventListener('click', (evento) => {
+            if (evento.target === modalEndPointFundo) {
+                modalEndPointFundo.classList.remove('flex');
+                modalEndPointFundo.classList.add('hidden');
+            }
+        });
+
+        carregarEndPoints();
+    </script>
+</body>
+</html>
