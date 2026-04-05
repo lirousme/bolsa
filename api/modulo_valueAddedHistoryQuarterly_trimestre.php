@@ -20,7 +20,7 @@ function carregarEnv($caminho) {
 }
 
 // 1. Carrega o arquivo .env
-carregarEnv(__DIR__ . '/.env');
+carregarEnv(__DIR__ . '/../.env');
 
 // 2. Obtém o token
 $token = getenv('TOKEN_BRAPI');
