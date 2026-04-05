@@ -112,4 +112,64 @@ if ($metodo === 'POST') {
     }
 }
 
+if ($metodo === 'PUT') {
+    $conteudo = file_get_contents('php://input');
+    $dados = json_decode($conteudo, true);
+
+    $id = isset($dados['id']) ? (int) $dados['id'] : 0;
+    $nome = isset($dados['nome']) ? trim((string) $dados['nome']) : '';
+    $estruturaDaResposta = isset($dados['estrutura_da_resposta']) ? trim((string) $dados['estrutura_da_resposta']) : '';
+    $caminho = isset($dados['caminho']) ? trim((string) $dados['caminho']) : '';
+
+    if ($id <= 0) {
+        responderJson(422, ['erro' => 'Informe um id válido do end point.']);
+    }
+
+    if ($nome === '') {
+        responderJson(422, ['erro' => 'Informe o nome do end point.']);
+    }
+
+    if ($estruturaDaResposta === '') {
+        responderJson(422, ['erro' => 'Informe a estrutura da resposta.']);
+    }
+
+    if ($caminho === '') {
+        responderJson(422, ['erro' => 'Informe o caminho da API.']);
+    }
+
+    try {
+        $stmt = $pdo->prepare(
+            'UPDATE end_points
+             SET nome = :nome, estrutura_da_resposta = :estrutura_da_resposta, caminho = :caminho
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            ':id' => $id,
+            ':nome' => $nome,
+            ':estrutura_da_resposta' => $estruturaDaResposta,
+            ':caminho' => $caminho,
+        ]);
+
+        if ($stmt->rowCount() === 0) {
+            $stmtExiste = $pdo->prepare('SELECT id FROM end_points WHERE id = :id LIMIT 1');
+            $stmtExiste->execute([':id' => $id]);
+            if (!$stmtExiste->fetch()) {
+                responderJson(404, ['erro' => 'End point não encontrado.']);
+            }
+        }
+
+        responderJson(200, [
+            'mensagem' => 'End point atualizado com sucesso.',
+            'end_point' => [
+                'id' => $id,
+                'nome' => $nome,
+                'estrutura_da_resposta' => $estruturaDaResposta,
+                'caminho' => $caminho,
+            ],
+        ]);
+    } catch (PDOException $e) {
+        responderJson(500, ['erro' => 'Não foi possível atualizar o end point.', 'detalhes' => $e->getMessage()]);
+    }
+}
+
 responderJson(405, ['erro' => 'Método não permitido.']);
