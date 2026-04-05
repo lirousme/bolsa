@@ -1,203 +1,93 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lista de Empresas</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 24px;
-            background: #f4f6f8;
-            color: #1f2937;
-        }
-
-        .container {
-            max-width: 860px;
-            margin: 0 auto;
-            background: #fff;
-            border-radius: 12px;
-            padding: 24px;
-            box-shadow: 0 8px 24px rgba(31, 41, 55, 0.1);
-        }
-
-        .cabecalho {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 24px;
-        }
-
-        .botao-adicionar {
-            border: none;
-            background: #2563eb;
-            color: #fff;
-            font-size: 28px;
-            width: 42px;
-            height: 42px;
-            border-radius: 50%;
-            cursor: pointer;
-            line-height: 1;
-        }
-
-        .botao-adicionar:hover {
-            background: #1d4ed8;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: #fff;
-        }
-
-        th,
-        td {
-            text-align: left;
-            padding: 12px;
-            border-bottom: 1px solid #e5e7eb;
-        }
-
-        th {
-            background: #f9fafb;
-        }
-
-        .mensagem {
-            margin-bottom: 12px;
-            padding: 10px;
-            border-radius: 8px;
-            display: none;
-        }
-
-        .mensagem.sucesso {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .mensagem.erro {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .modal-fundo {
-            position: fixed;
-            inset: 0;
-            background: rgba(17, 24, 39, 0.6);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 16px;
-        }
-
-        .modal {
-            width: 100%;
-            max-width: 420px;
-            background: #ffffff;
-            border-radius: 12px;
-            padding: 24px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-        }
-
-        .campo {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #d1d5db;
-            border-radius: 8px;
-            margin: 10px 0 16px;
-            box-sizing: border-box;
-        }
-
-        .acoes-modal {
-            display: flex;
-            justify-content: flex-end;
-            gap: 8px;
-        }
-
-        .botao {
-            border: none;
-            border-radius: 8px;
-            padding: 10px 14px;
-            cursor: pointer;
-        }
-
-        .botao.cancelar {
-            background: #e5e7eb;
-            color: #111827;
-        }
-
-        .botao.salvar {
-            background: #2563eb;
-            color: white;
-        }
-    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class'
+        };
+    </script>
 </head>
-<body>
-    <main class="container">
-        <div class="cabecalho">
-            <h1>Empresas cadastradas</h1>
-            <button class="botao-adicionar" id="abrirModal" title="Adicionar empresa">+</button>
+<body class="bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-100 min-h-screen p-6">
+    <main class="mx-auto max-w-5xl rounded-2xl bg-white/90 p-6 shadow-xl ring-1 ring-slate-200 backdrop-blur dark:bg-slate-900/90 dark:ring-slate-800">
+        <div class="mb-6 flex items-center justify-between gap-4">
+            <h1 class="text-2xl font-bold md:text-3xl">Empresas cadastradas</h1>
+            <button
+                class="h-11 w-11 rounded-full bg-blue-600 text-3xl leading-none text-white transition hover:bg-blue-500"
+                id="abrirModal"
+                title="Adicionar empresa"
+                type="button"
+            >+</button>
         </div>
 
-        <div id="mensagem" class="mensagem"></div>
+        <div id="mensagem" class="mb-4 hidden rounded-lg p-3 text-sm"></div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Nome com caracteres especiais</th>
-                    <th>Nome sem caracteres especiais</th>
-                </tr>
-            </thead>
-            <tbody id="corpoTabela">
-                <tr>
-                    <td colspan="3">Carregando empresas...</td>
-                </tr>
-            </tbody>
-        </table>
+        <section id="listaEmpresas" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                Carregando empresas...
+            </div>
+        </section>
     </main>
 
-    <div class="modal-fundo" id="modalFundo">
-        <div class="modal">
-            <h2>Nova empresa</h2>
-            <label for="nomeEmpresa">Nome da empresa (com acentos e espaços):</label>
-            <input class="campo" id="nomeEmpresa" type="text" placeholder="Ex: São João Tecnologia" />
+    <div class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/70 p-4" id="modalFundo">
+        <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+            <h2 class="mb-4 text-xl font-semibold">Nova empresa</h2>
+            <label for="nomeEmpresa" class="text-sm text-slate-600 dark:text-slate-300">Nome da empresa (com acentos e espaços):</label>
+            <input
+                class="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-800"
+                id="nomeEmpresa"
+                type="text"
+                placeholder="Ex: São João Tecnologia"
+            />
 
-            <div class="acoes-modal">
-                <button class="botao cancelar" id="fecharModal">Cancelar</button>
-                <button class="botao salvar" id="salvarEmpresa">Salvar</button>
+            <div class="mt-6 flex justify-end gap-2">
+                <button class="rounded-lg bg-slate-200 px-4 py-2 text-slate-800 transition hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600" id="fecharModal" type="button">Cancelar</button>
+                <button class="rounded-lg bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-500" id="salvarEmpresa" type="button">Salvar</button>
             </div>
         </div>
     </div>
 
     <script>
-        const corpoTabela = document.getElementById('corpoTabela');
+        const listaEmpresas = document.getElementById('listaEmpresas');
         const mensagem = document.getElementById('mensagem');
         const modalFundo = document.getElementById('modalFundo');
         const campoNomeEmpresa = document.getElementById('nomeEmpresa');
 
         function mostrarMensagem(texto, tipo) {
             mensagem.textContent = texto;
-            mensagem.className = `mensagem ${tipo}`;
-            mensagem.style.display = 'block';
+            mensagem.className = 'mb-4 rounded-lg p-3 text-sm';
+
+            if (tipo === 'sucesso') {
+                mensagem.classList.add('bg-emerald-100', 'text-emerald-900', 'dark:bg-emerald-950', 'dark:text-emerald-200');
+            } else {
+                mensagem.classList.add('bg-red-100', 'text-red-900', 'dark:bg-red-950', 'dark:text-red-200');
+            }
+
+            mensagem.classList.remove('hidden');
         }
 
         function ocultarMensagem() {
-            mensagem.style.display = 'none';
+            mensagem.classList.add('hidden');
         }
 
         function renderizarEmpresas(empresas) {
             if (!Array.isArray(empresas) || empresas.length === 0) {
-                corpoTabela.innerHTML = '<tr><td colspan="3">Nenhuma empresa cadastrada.</td></tr>';
+                listaEmpresas.innerHTML = `
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        Nenhuma empresa cadastrada.
+                    </div>
+                `;
                 return;
             }
 
-            corpoTabela.innerHTML = empresas
+            listaEmpresas.innerHTML = empresas
                 .map((empresa) => `
-                    <tr>
-                        <td>${empresa.id}</td>
-                        <td>${empresa.nome_com_caracteres_especiais}</td>
-                        <td>${empresa.nome_sem_caracteres_especiais}</td>
-                    </tr>
+                    <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800">
+                        <p class="text-base font-medium text-slate-800 dark:text-slate-100">${empresa.nome_com_caracteres_especiais}</p>
+                    </article>
                 `)
                 .join('');
         }
@@ -215,7 +105,11 @@
 
                 renderizarEmpresas(dados.empresas);
             } catch (erro) {
-                corpoTabela.innerHTML = '<tr><td colspan="3">Não foi possível carregar as empresas.</td></tr>';
+                listaEmpresas.innerHTML = `
+                    <div class="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
+                        Não foi possível carregar as empresas.
+                    </div>
+                `;
                 mostrarMensagem(erro.message, 'erro');
             }
         }
@@ -244,7 +138,8 @@
                 }
 
                 campoNomeEmpresa.value = '';
-                modalFundo.style.display = 'none';
+                modalFundo.classList.remove('flex');
+                modalFundo.classList.add('hidden');
                 mostrarMensagem(dados.mensagem || 'Empresa cadastrada com sucesso.', 'sucesso');
                 await carregarEmpresas();
             } catch (erro) {
@@ -253,19 +148,22 @@
         }
 
         document.getElementById('abrirModal').addEventListener('click', () => {
-            modalFundo.style.display = 'flex';
+            modalFundo.classList.remove('hidden');
+            modalFundo.classList.add('flex');
             campoNomeEmpresa.focus();
         });
 
         document.getElementById('fecharModal').addEventListener('click', () => {
-            modalFundo.style.display = 'none';
+            modalFundo.classList.remove('flex');
+            modalFundo.classList.add('hidden');
         });
 
         document.getElementById('salvarEmpresa').addEventListener('click', cadastrarEmpresa);
 
         modalFundo.addEventListener('click', (evento) => {
             if (evento.target === modalFundo) {
-                modalFundo.style.display = 'none';
+                modalFundo.classList.remove('flex');
+                modalFundo.classList.add('hidden');
             }
         });
 
