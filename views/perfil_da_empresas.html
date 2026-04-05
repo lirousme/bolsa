@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perfil da Empresa</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class'
+        };
+    </script>
+</head>
+<body class="bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-100 min-h-screen p-6">
+    <main class="mx-auto max-w-4xl rounded-2xl bg-white/90 p-6 shadow-xl ring-1 ring-slate-200 backdrop-blur dark:bg-slate-900/90 dark:ring-slate-800">
+        <header class="mb-6 flex items-center justify-between gap-4">
+            <div>
+                <a href="./lista_de_empresas.html" class="text-sm text-blue-600 hover:underline dark:text-blue-300">← Voltar para empresas</a>
+                <h1 id="nomeEmpresa" class="mt-2 text-2xl font-bold md:text-3xl">Carregando empresa...</h1>
+            </div>
+            <button
+                class="h-11 w-11 rounded-full bg-blue-600 text-3xl leading-none text-white transition hover:bg-blue-500"
+                id="abrirModalTicker"
+                title="Adicionar ticker"
+                type="button"
+            >+</button>
+        </header>
+
+        <div id="mensagem" class="mb-4 hidden rounded-lg p-3 text-sm"></div>
+
+        <section id="listaTickers" class="space-y-3">
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                Carregando tickers...
+            </div>
+        </section>
+    </main>
+
+    <div class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/70 p-4" id="modalTickerFundo">
+        <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+            <h2 class="mb-4 text-xl font-semibold">Novo ticker</h2>
+            <label for="tickerInput" class="text-sm text-slate-600 dark:text-slate-300">Ticker:</label>
+            <input
+                class="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-800"
+                id="tickerInput"
+                type="text"
+                placeholder="Ex: PETR4"
+                autocomplete="off"
+            />
+
+            <div class="mt-6 flex justify-end gap-2">
+                <button class="rounded-lg bg-slate-200 px-4 py-2 text-slate-800 transition hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600" id="fecharModalTicker" type="button">Cancelar</button>
+                <button class="rounded-lg bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-500" id="salvarTicker" type="button">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const parametros = new URLSearchParams(window.location.search);
+        const idEmpresa = Number.parseInt(parametros.get('id'), 10);
+
+        const nomeEmpresaEl = document.getElementById('nomeEmpresa');
+        const listaTickers = document.getElementById('listaTickers');
+        const mensagem = document.getElementById('mensagem');
+        const modalTickerFundo = document.getElementById('modalTickerFundo');
+        const tickerInput = document.getElementById('tickerInput');
+
+        function mostrarMensagem(texto, tipo) {
+            mensagem.textContent = texto;
+            mensagem.className = 'mb-4 rounded-lg p-3 text-sm';
+
+            if (tipo === 'sucesso') {
+                mensagem.classList.add('bg-emerald-100', 'text-emerald-900', 'dark:bg-emerald-950', 'dark:text-emerald-200');
+            } else {
+                mensagem.classList.add('bg-red-100', 'text-red-900', 'dark:bg-red-950', 'dark:text-red-200');
+            }
+
+            mensagem.classList.remove('hidden');
+        }
+
+        function ocultarMensagem() {
+            mensagem.classList.add('hidden');
+        }
+
+        function renderizarTickers(tickers) {
+            if (!Array.isArray(tickers) || tickers.length === 0) {
+                listaTickers.innerHTML = `
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        Esta empresa ainda não possui tickers cadastrados.
+                    </div>
+                `;
+                return;
+            }
+
+            listaTickers.innerHTML = tickers
+                .map((item) => `
+                    <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                        <p class="text-base font-semibold tracking-wide text-slate-800 dark:text-slate-100">${item.ticker}</p>
+                    </article>
+                `)
+                .join('');
+        }
+
+        async function carregarPerfil() {
+            ocultarMensagem();
+
+            if (!Number.isInteger(idEmpresa) || idEmpresa <= 0) {
+                nomeEmpresaEl.textContent = 'Empresa inválida';
+                listaTickers.innerHTML = `
+                    <div class="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
+                        ID da empresa não informado corretamente.
+                    </div>
+                `;
+                return;
+            }
+
+            try {
+                const resposta = await fetch(`../empresas/gerenciar_tickers.php?id_empresa=${idEmpresa}`);
+                const dados = await resposta.json();
+
+                if (!resposta.ok) {
+                    throw new Error(dados.erro || 'Falha ao carregar dados da empresa.');
+                }
+
+                nomeEmpresaEl.textContent = dados.empresa.nome_com_caracteres_especiais;
+                renderizarTickers(dados.tickers);
+            } catch (erro) {
+                nomeEmpresaEl.textContent = 'Erro ao carregar empresa';
+                listaTickers.innerHTML = `
+                    <div class="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
+                        Não foi possível carregar os tickers desta empresa.
+                    </div>
+                `;
+                mostrarMensagem(erro.message, 'erro');
+            }
+        }
+
+        async function cadastrarTicker() {
+            ocultarMensagem();
+
+            const tickerInformado = tickerInput.value.trim();
+            if (!tickerInformado) {
+                mostrarMensagem('Informe o ticker.', 'erro');
+                return;
+            }
+
+            try {
+                const resposta = await fetch('../empresas/gerenciar_tickers.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        id_empresa: idEmpresa,
+                        ticker: tickerInformado
+                    })
+                });
+
+                const dados = await resposta.json();
+
+                if (!resposta.ok) {
+                    throw new Error(dados.erro || 'Falha ao cadastrar ticker.');
+                }
+
+                tickerInput.value = '';
+                modalTickerFundo.classList.remove('flex');
+                modalTickerFundo.classList.add('hidden');
+                mostrarMensagem(dados.mensagem || 'Ticker cadastrado com sucesso.', 'sucesso');
+                await carregarPerfil();
+            } catch (erro) {
+                mostrarMensagem(erro.message, 'erro');
+            }
+        }
+
+        document.getElementById('abrirModalTicker').addEventListener('click', () => {
+            modalTickerFundo.classList.remove('hidden');
+            modalTickerFundo.classList.add('flex');
+            tickerInput.focus();
+        });
+
+        document.getElementById('fecharModalTicker').addEventListener('click', () => {
+            modalTickerFundo.classList.remove('flex');
+            modalTickerFundo.classList.add('hidden');
+        });
+
+        document.getElementById('salvarTicker').addEventListener('click', cadastrarTicker);
+
+        modalTickerFundo.addEventListener('click', (evento) => {
+            if (evento.target === modalTickerFundo) {
+                modalTickerFundo.classList.remove('flex');
+                modalTickerFundo.classList.add('hidden');
+            }
+        });
+
+        carregarPerfil();
+    </script>
+</body>
+</html>
