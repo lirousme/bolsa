@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista de Empresas</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 24px;
+            background: #f4f6f8;
+            color: #1f2937;
+        }
+
+        .container {
+            max-width: 860px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 8px 24px rgba(31, 41, 55, 0.1);
+        }
+
+        .cabecalho {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .botao-adicionar {
+            border: none;
+            background: #2563eb;
+            color: #fff;
+            font-size: 28px;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .botao-adicionar:hover {
+            background: #1d4ed8;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        th {
+            background: #f9fafb;
+        }
+
+        .mensagem {
+            margin-bottom: 12px;
+            padding: 10px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .mensagem.sucesso {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .mensagem.erro {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .modal-fundo {
+            position: fixed;
+            inset: 0;
+            background: rgba(17, 24, 39, 0.6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        .modal {
+            width: 100%;
+            max-width: 420px;
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .campo {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            margin: 10px 0 16px;
+            box-sizing: border-box;
+        }
+
+        .acoes-modal {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .botao {
+            border: none;
+            border-radius: 8px;
+            padding: 10px 14px;
+            cursor: pointer;
+        }
+
+        .botao.cancelar {
+            background: #e5e7eb;
+            color: #111827;
+        }
+
+        .botao.salvar {
+            background: #2563eb;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <div class="cabecalho">
+            <h1>Empresas cadastradas</h1>
+            <button class="botao-adicionar" id="abrirModal" title="Adicionar empresa">+</button>
+        </div>
+
+        <div id="mensagem" class="mensagem"></div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nome com caracteres especiais</th>
+                    <th>Nome sem caracteres especiais</th>
+                </tr>
+            </thead>
+            <tbody id="corpoTabela">
+                <tr>
+                    <td colspan="3">Carregando empresas...</td>
+                </tr>
+            </tbody>
+        </table>
+    </main>
+
+    <div class="modal-fundo" id="modalFundo">
+        <div class="modal">
+            <h2>Nova empresa</h2>
+            <label for="nomeEmpresa">Nome da empresa (com acentos e espaços):</label>
+            <input class="campo" id="nomeEmpresa" type="text" placeholder="Ex: São João Tecnologia" />
+
+            <div class="acoes-modal">
+                <button class="botao cancelar" id="fecharModal">Cancelar</button>
+                <button class="botao salvar" id="salvarEmpresa">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const corpoTabela = document.getElementById('corpoTabela');
+        const mensagem = document.getElementById('mensagem');
+        const modalFundo = document.getElementById('modalFundo');
+        const campoNomeEmpresa = document.getElementById('nomeEmpresa');
+
+        function mostrarMensagem(texto, tipo) {
+            mensagem.textContent = texto;
+            mensagem.className = `mensagem ${tipo}`;
+            mensagem.style.display = 'block';
+        }
+
+        function ocultarMensagem() {
+            mensagem.style.display = 'none';
+        }
+
+        function renderizarEmpresas(empresas) {
+            if (!Array.isArray(empresas) || empresas.length === 0) {
+                corpoTabela.innerHTML = '<tr><td colspan="3">Nenhuma empresa cadastrada.</td></tr>';
+                return;
+            }
+
+            corpoTabela.innerHTML = empresas
+                .map((empresa) => `
+                    <tr>
+                        <td>${empresa.id}</td>
+                        <td>${empresa.nome_com_caracteres_especiais}</td>
+                        <td>${empresa.nome_sem_caracteres_especiais}</td>
+                    </tr>
+                `)
+                .join('');
+        }
+
+        async function carregarEmpresas() {
+            ocultarMensagem();
+
+            try {
+                const resposta = await fetch('../empresas/gerenciar_empresas.php');
+                const dados = await resposta.json();
+
+                if (!resposta.ok) {
+                    throw new Error(dados.erro || 'Falha ao buscar empresas.');
+                }
+
+                renderizarEmpresas(dados.empresas);
+            } catch (erro) {
+                corpoTabela.innerHTML = '<tr><td colspan="3">Não foi possível carregar as empresas.</td></tr>';
+                mostrarMensagem(erro.message, 'erro');
+            }
+        }
+
+        async function cadastrarEmpresa() {
+            const nome = campoNomeEmpresa.value.trim();
+
+            if (!nome) {
+                mostrarMensagem('Informe o nome da empresa.', 'erro');
+                return;
+            }
+
+            try {
+                const resposta = await fetch('../empresas/gerenciar_empresas.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ nome_com_caracteres_especiais: nome })
+                });
+
+                const dados = await resposta.json();
+
+                if (!resposta.ok) {
+                    throw new Error(dados.erro || 'Falha ao cadastrar empresa.');
+                }
+
+                campoNomeEmpresa.value = '';
+                modalFundo.style.display = 'none';
+                mostrarMensagem(dados.mensagem || 'Empresa cadastrada com sucesso.', 'sucesso');
+                await carregarEmpresas();
+            } catch (erro) {
+                mostrarMensagem(erro.message, 'erro');
+            }
+        }
+
+        document.getElementById('abrirModal').addEventListener('click', () => {
+            modalFundo.style.display = 'flex';
+            campoNomeEmpresa.focus();
+        });
+
+        document.getElementById('fecharModal').addEventListener('click', () => {
+            modalFundo.style.display = 'none';
+        });
+
+        document.getElementById('salvarEmpresa').addEventListener('click', cadastrarEmpresa);
+
+        modalFundo.addEventListener('click', (evento) => {
+            if (evento.target === modalFundo) {
+                modalFundo.style.display = 'none';
+            }
+        });
+
+        carregarEmpresas();
+    </script>
+</body>
+</html>
