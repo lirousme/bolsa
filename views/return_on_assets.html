@@ -130,6 +130,25 @@
                 return;
             }
 
+            const registrosOrdenados = [...registros].sort((a, b) => {
+                const dataA = Date.parse(`${a.end_date || ''}T00:00:00`);
+                const dataB = Date.parse(`${b.end_date || ''}T00:00:00`);
+
+                if (Number.isNaN(dataA) && Number.isNaN(dataB)) {
+                    return 0;
+                }
+
+                if (Number.isNaN(dataA)) {
+                    return 1;
+                }
+
+                if (Number.isNaN(dataB)) {
+                    return -1;
+                }
+
+                return dataB - dataA;
+            });
+
             const valoresValidos = registros
                 .map((item) => Number(item.return_on_assets))
                 .filter((valor) => Number.isFinite(valor));
@@ -146,7 +165,7 @@
                 ? Math.max(...valoresValidos.map((valor) => Math.abs(valor)))
                 : 0;
 
-            grafico.innerHTML = registros.map((registro) => {
+            grafico.innerHTML = registrosOrdenados.map((registro) => {
                 const valor = Number(registro.return_on_assets);
                 const temValor = Number.isFinite(valor);
                 const larguraBase = maiorAbsoluto > 0 && temValor
