@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indicadores do Ticker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class'
+        };
+    </script>
+</head>
+<body class="bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-100 min-h-screen p-6">
+    <main class="mx-auto max-w-4xl rounded-2xl bg-white/90 p-6 shadow-xl ring-1 ring-slate-200 backdrop-blur dark:bg-slate-900/90 dark:ring-slate-800">
+        <header class="mb-8">
+            <a id="linkVoltar" href="./perfil_da_empresas.html" class="text-sm text-blue-600 hover:underline dark:text-blue-300">← Voltar para perfil da empresa</a>
+            <h1 class="mt-2 text-2xl font-bold md:text-3xl">Indicadores de <span id="tickerNome">ticker</span></h1>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Selecione o indicador para visualizar os dados.</p>
+        </header>
+
+        <div id="mensagemErro" class="hidden rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200"></div>
+
+        <section id="cardsIndicadores" class="grid gap-4 sm:grid-cols-2">
+            <article class="rounded-xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-800">
+                <h2 class="text-lg font-semibold">Histórico de cotações</h2>
+                <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Veja a evolução do preço ao longo do tempo.</p>
+                <a id="linkHistorico" class="mt-4 inline-flex items-center gap-2 text-blue-700 transition hover:underline dark:text-blue-300" href="#">
+                    Ver histórico de cotações →
+                </a>
+            </article>
+
+            <article class="rounded-xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-800">
+                <h2 class="text-lg font-semibold">Retorno sobre ativos (ROA)</h2>
+                <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Acompanhe o gráfico do indicador ROA.</p>
+                <a id="linkRoa" class="mt-4 inline-flex items-center gap-2 text-emerald-700 transition hover:underline dark:text-emerald-300" href="#">
+                    Ver gráfico de ROA →
+                </a>
+            </article>
+        </section>
+    </main>
+
+    <script>
+        const parametros = new URLSearchParams(window.location.search);
+        const idEmpresa = Number.parseInt(parametros.get('id_empresa'), 10);
+        const idTicker = Number.parseInt(parametros.get('id_ticker'), 10);
+        const ticker = parametros.get('ticker');
+
+        const tickerNomeEl = document.getElementById('tickerNome');
+        const mensagemErro = document.getElementById('mensagemErro');
+        const linkHistorico = document.getElementById('linkHistorico');
+        const linkRoa = document.getElementById('linkRoa');
+        const linkVoltar = document.getElementById('linkVoltar');
+
+        function mostrarErro(texto) {
+            mensagemErro.textContent = texto;
+            mensagemErro.classList.remove('hidden');
+            document.getElementById('cardsIndicadores').classList.add('hidden');
+        }
+
+        if (!Number.isInteger(idEmpresa) || idEmpresa <= 0 || !Number.isInteger(idTicker) || idTicker <= 0 || !ticker) {
+            mostrarErro('Parâmetros inválidos para abrir os indicadores do ticker.');
+        } else {
+            const query = `id_empresa=${idEmpresa}&id_ticker=${idTicker}&ticker=${encodeURIComponent(ticker)}`;
+
+            tickerNomeEl.textContent = ticker;
+            linkVoltar.href = `./perfil_da_empresas.html?id=${idEmpresa}`;
+            linkHistorico.href = `./historico_de_cotacoes.html?${query}`;
+            linkRoa.href = `./return_on_assets.html?${query}`;
+        }
+    </script>
+</body>
+</html>
