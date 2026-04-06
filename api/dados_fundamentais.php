@@ -4,6 +4,4 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/_brapi_helper.php';
 
-processarEndpointBrapi([
-    'fundamental' => 'true',
-]);
+processarEndpointFundamentals();
