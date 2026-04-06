@@ -117,34 +117,69 @@ function prepararLinhasParaInsercao(mixed $dadosDoModulo): array
     return [];
 }
 
-function registroJaExiste(PDO $pdo, string $tabela, array $colunas, array $valores): bool
+function normalizarValorComparacao(mixed $valor): string
 {
-    if (count($colunas) === 0 || count($valores) === 0) {
+    if ($valor === null) {
+        return '__NULL__';
+    }
+
+    if (is_bool($valor)) {
+        return $valor ? '1' : '0';
+    }
+
+    if (is_int($valor) || is_string($valor)) {
+        return (string) $valor;
+    }
+
+    if (is_float($valor)) {
+        $normalizado = number_format($valor, 12, '.', '');
+        return rtrim(rtrim($normalizado, '0'), '.');
+    }
+
+    return json_encode($valor, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '';
+}
+
+function carregarRegistrosExistentesPorTicker(PDO $pdo, string $tabela, int $idTicker): array
+{
+    $sql = "SELECT * FROM `{$tabela}` WHERE `id_ticker` = :id_ticker";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([':id_ticker' => $idTicker]);
+    $registros = $stmt->fetchAll();
+
+    return is_array($registros) ? $registros : [];
+}
+
+function registroJaExistePorComparacaoLocal(array $registrosExistentes, array $valoresPorColuna): bool
+{
+    if (count($valoresPorColuna) === 0) {
         return false;
     }
 
-    $colunas = array_values(array_unique($colunas));
-    $condicoes = [];
-    $valoresFiltrados = [];
-    foreach ($colunas as $coluna) {
-        $placeholder = ':' . $coluna;
-        if (!array_key_exists($placeholder, $valores)) {
+    foreach ($registrosExistentes as $registroExistente) {
+        if (!is_array($registroExistente)) {
             continue;
         }
 
-        $condicoes[] = "`{$coluna}` <=> {$placeholder}";
-        $valoresFiltrados[$placeholder] = $valores[$placeholder];
+        $todosIguais = true;
+        foreach ($valoresPorColuna as $coluna => $valorNovo) {
+            if (!array_key_exists($coluna, $registroExistente)) {
+                $todosIguais = false;
+                break;
+            }
+
+            $valorExistente = $registroExistente[$coluna];
+            if (normalizarValorComparacao($valorExistente) !== normalizarValorComparacao($valorNovo)) {
+                $todosIguais = false;
+                break;
+            }
+        }
+
+        if ($todosIguais) {
+            return true;
+        }
     }
 
-    if (count($condicoes) === 0) {
-        return false;
-    }
-
-    $sql = "SELECT 1 FROM `{$tabela}` WHERE " . implode(' AND ', $condicoes) . ' LIMIT 1';
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($valoresFiltrados);
-
-    return (bool) $stmt->fetchColumn();
+    return false;
 }
 
 function salvarRespostaModuloEmTabela(PDO $pdo, array $resultadoBrapi, array $mapaTickers, string $modulo, string $tabela): array
@@ -158,6 +193,7 @@ function salvarRespostaModuloEmTabela(PDO $pdo, array $resultadoBrapi, array $ma
     $totalInseridos = 0;
     $totalIgnorados = 0;
     $totalSemTicker = 0;
+    $cacheRegistrosExistentes = [];
 
     $results = $resultadoBrapi['results'] ?? [];
     if (!is_array($results)) {
@@ -179,6 +215,10 @@ function salvarRespostaModuloEmTabela(PDO $pdo, array $resultadoBrapi, array $ma
         if (!$idTicker) {
             $totalSemTicker++;
             continue;
+        }
+
+        if (!array_key_exists($idTicker, $cacheRegistrosExistentes)) {
+            $cacheRegistrosExistentes[$idTicker] = carregarRegistrosExistentesPorTicker($pdo, $tabela, (int) $idTicker);
         }
 
         $dadosDoModulo = $resultadoTicker[$modulo] ?? null;
@@ -218,7 +258,15 @@ function salvarRespostaModuloEmTabela(PDO $pdo, array $resultadoBrapi, array $ma
                 continue;
             }
 
-            if (registroJaExiste($pdo, $tabela, $colunas, $valores)) {
+            $valoresPorColuna = [];
+            foreach ($colunas as $coluna) {
+                $placeholder = ':' . $coluna;
+                if (array_key_exists($placeholder, $valores)) {
+                    $valoresPorColuna[$coluna] = $valores[$placeholder];
+                }
+            }
+
+            if (registroJaExistePorComparacaoLocal($cacheRegistrosExistentes[$idTicker], $valoresPorColuna)) {
                 $totalIgnorados++;
                 continue;
             }
@@ -229,6 +277,7 @@ function salvarRespostaModuloEmTabela(PDO $pdo, array $resultadoBrapi, array $ma
 
             $stmt = $pdo->prepare($sql);
             $stmt->execute($valores);
+            $cacheRegistrosExistentes[$idTicker][] = $valoresPorColuna;
             $totalInseridos++;
         }
     }
@@ -259,6 +308,7 @@ function salvarRespostaDividendosNoBanco(PDO $pdo, array $resultadoBrapi, array 
     $totalInseridos = 0;
     $totalIgnorados = 0;
     $totalSemTicker = 0;
+    $cacheRegistrosExistentes = [];
 
     $results = $resultadoBrapi['results'] ?? [];
     if (!is_array($results)) {
@@ -280,6 +330,10 @@ function salvarRespostaDividendosNoBanco(PDO $pdo, array $resultadoBrapi, array 
         if (!$idTicker) {
             $totalSemTicker++;
             continue;
+        }
+
+        if (!array_key_exists($idTicker, $cacheRegistrosExistentes)) {
+            $cacheRegistrosExistentes[$idTicker] = carregarRegistrosExistentesPorTicker($pdo, $tabela, (int) $idTicker);
         }
 
         $dadosDividendos = $resultadoTicker['dividendsData']['cashDividends'] ?? [];
@@ -322,7 +376,15 @@ function salvarRespostaDividendosNoBanco(PDO $pdo, array $resultadoBrapi, array 
                 continue;
             }
 
-            if (registroJaExiste($pdo, $tabela, $colunas, $valores)) {
+            $valoresPorColuna = [];
+            foreach ($colunas as $coluna) {
+                $placeholder = ':' . $coluna;
+                if (array_key_exists($placeholder, $valores)) {
+                    $valoresPorColuna[$coluna] = $valores[$placeholder];
+                }
+            }
+
+            if (registroJaExistePorComparacaoLocal($cacheRegistrosExistentes[$idTicker], $valoresPorColuna)) {
                 $totalIgnorados++;
                 continue;
             }
@@ -333,6 +395,7 @@ function salvarRespostaDividendosNoBanco(PDO $pdo, array $resultadoBrapi, array 
 
             $stmt = $pdo->prepare($sql);
             $stmt->execute($valores);
+            $cacheRegistrosExistentes[$idTicker][] = $valoresPorColuna;
             $totalInseridos++;
         }
     }
@@ -357,6 +420,7 @@ function salvarRespostaFundamentalsNoBanco(PDO $pdo, array $resultadoBrapi, arra
     $totalInseridos = 0;
     $totalIgnorados = 0;
     $totalSemTicker = 0;
+    $cacheRegistrosExistentes = [];
 
     $results = $resultadoBrapi['results'] ?? [];
     if (!is_array($results)) {
@@ -379,6 +443,10 @@ function salvarRespostaFundamentalsNoBanco(PDO $pdo, array $resultadoBrapi, arra
         if (!$idTicker) {
             $totalSemTicker++;
             continue;
+        }
+
+        if (!array_key_exists($idTicker, $cacheRegistrosExistentes)) {
+            $cacheRegistrosExistentes[$idTicker] = carregarRegistrosExistentesPorTicker($pdo, $tabela, (int) $idTicker);
         }
 
         $colunas = [];
@@ -413,7 +481,15 @@ function salvarRespostaFundamentalsNoBanco(PDO $pdo, array $resultadoBrapi, arra
             continue;
         }
 
-        if (registroJaExiste($pdo, $tabela, $colunas, $valores)) {
+        $valoresPorColuna = [];
+        foreach ($colunas as $coluna) {
+            $placeholder = ':' . $coluna;
+            if (array_key_exists($placeholder, $valores)) {
+                $valoresPorColuna[$coluna] = $valores[$placeholder];
+            }
+        }
+
+        if (registroJaExistePorComparacaoLocal($cacheRegistrosExistentes[$idTicker], $valoresPorColuna)) {
             $totalIgnorados++;
             continue;
         }
@@ -424,6 +500,7 @@ function salvarRespostaFundamentalsNoBanco(PDO $pdo, array $resultadoBrapi, arra
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute($valores);
+        $cacheRegistrosExistentes[$idTicker][] = $valoresPorColuna;
         $totalInseridos++;
     }
 
