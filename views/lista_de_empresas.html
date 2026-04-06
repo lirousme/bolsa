@@ -15,12 +15,19 @@
     <main class="mx-auto max-w-5xl rounded-2xl bg-white/90 p-6 shadow-xl ring-1 ring-slate-200 backdrop-blur dark:bg-slate-900/90 dark:ring-slate-800">
         <div class="mb-6 flex items-center justify-between gap-4">
             <h1 class="text-2xl font-bold md:text-3xl">Empresas cadastradas</h1>
-            <button
-                class="h-11 w-11 rounded-full bg-blue-600 text-3xl leading-none text-white transition hover:bg-blue-500"
-                id="abrirModal"
-                title="Adicionar empresa"
-                type="button"
-            >+</button>
+            <div class="flex items-center gap-2">
+                <a
+                    class="inline-flex h-11 items-center justify-center rounded-lg bg-slate-700 px-4 text-sm font-semibold uppercase tracking-wide text-white transition hover:bg-slate-600"
+                    href="./end_points.html"
+                    title="Área administrativa"
+                >Adm</a>
+                <button
+                    class="h-11 w-11 rounded-full bg-blue-600 text-3xl leading-none text-white transition hover:bg-blue-500"
+                    id="abrirModal"
+                    title="Adicionar empresa"
+                    type="button"
+                >+</button>
+            </div>
         </div>
 
         <div id="mensagem" class="mb-4 hidden rounded-lg p-3 text-sm"></div>
