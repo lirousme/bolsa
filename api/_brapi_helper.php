@@ -292,6 +292,87 @@ function salvarRespostaDividendosNoBanco(PDO $pdo, array $resultadoBrapi, array 
     ];
 }
 
+function salvarRespostaFundamentalsNoBanco(PDO $pdo, array $resultadoBrapi, array $mapaTickers): array
+{
+    $tabela = 'fundamentals';
+    $colunasTabela = buscarColunasTabela($pdo, $tabela);
+
+    if (empty($colunasTabela)) {
+        throw new RuntimeException("Tabela de destino não encontrada ou sem colunas: {$tabela}");
+    }
+
+    $totalInseridos = 0;
+    $totalIgnorados = 0;
+    $totalSemTicker = 0;
+
+    $results = $resultadoBrapi['results'] ?? [];
+    if (!is_array($results)) {
+        return [
+            'tabela' => $tabela,
+            'inseridos' => 0,
+            'ignorados' => 0,
+            'sem_ticker' => 0,
+        ];
+    }
+
+    foreach ($results as $resultadoTicker) {
+        if (!is_array($resultadoTicker)) {
+            $totalIgnorados++;
+            continue;
+        }
+
+        $ticker = strtoupper(trim((string) ($resultadoTicker['symbol'] ?? '')));
+        $idTicker = $mapaTickers[$ticker] ?? null;
+        if (!$idTicker) {
+            $totalSemTicker++;
+            continue;
+        }
+
+        $colunas = [];
+        $valores = [];
+
+        if (isset($colunasTabela['id_ticker'])) {
+            $colunas[] = 'id_ticker';
+            $valores[':id_ticker'] = (int) $idTicker;
+        }
+
+        foreach ($resultadoTicker as $atributo => $valor) {
+            if (is_array($valor) || is_object($valor)) {
+                continue;
+            }
+
+            $coluna = camelParaSnake((string) $atributo);
+            if (!isset($colunasTabela[$coluna])) {
+                continue;
+            }
+
+            $placeholder = ':' . $coluna;
+            $colunas[] = $coluna;
+            $valores[$placeholder] = $valor;
+        }
+
+        if (count($colunas) === 0 || (count($colunas) === 1 && $colunas[0] === 'id_ticker')) {
+            $totalIgnorados++;
+            continue;
+        }
+
+        $colunasSql = implode(', ', array_map(static fn ($c) => "`{$c}`", $colunas));
+        $placeholdersSql = implode(', ', array_keys($valores));
+        $sql = "INSERT INTO `{$tabela}` ({$colunasSql}) VALUES ({$placeholdersSql})";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($valores);
+        $totalInseridos++;
+    }
+
+    return [
+        'tabela' => $tabela,
+        'inseridos' => $totalInseridos,
+        'ignorados' => $totalIgnorados,
+        'sem_ticker' => $totalSemTicker,
+    ];
+}
+
 function chamarBrapi(string $token, array $tickersLote, string $queryString): array
 {
     $tickersEmTexto = implode(',', $tickersLote);
@@ -454,6 +535,71 @@ function processarEndpointBrapi(array $queryParams): void
 
     try {
         $resumoPersistencia = salvarRespostaNoBanco($pdo, (array) $resultado['resposta'], $mapaTickers, $modulo);
+    } catch (Throwable $e) {
+        responderJsonApi(500, [
+            'erro' => 'Falha ao salvar dados no banco.',
+            'detalhes' => $e->getMessage(),
+            'lote_atual' => $loteAtual,
+            'total_lotes' => $totalLotes,
+            'tickers_lote' => $tickersLote,
+        ]);
+    }
+
+    responderJsonApi(200, [
+        'lote_atual' => $loteAtual,
+        'total_lotes' => $totalLotes,
+        'lotes_restantes' => $totalLotes - $loteAtual,
+        'tickers_lote' => $tickersLote,
+        'url' => $resultado['url'],
+        'persistencia' => $resumoPersistencia,
+        'dados' => $resultado['resposta'],
+    ]);
+}
+
+function processarEndpointFundamentals(): void
+{
+    $pdo = obterConexaoBanco();
+    $mapaTickers = obterTickers($pdo);
+    $tickers = array_keys($mapaTickers);
+
+    if (count($tickers) === 0) {
+        responderJsonApi(422, ['erro' => 'Nenhum ticker encontrado na tabela tickers.']);
+    }
+
+    $token = getenv('TOKEN_BRAPI') ?: '';
+    if ($token === '') {
+        responderJsonApi(500, ['erro' => 'TOKEN_BRAPI não encontrado no .env.']);
+    }
+
+    $lotes = array_chunk($tickers, 20);
+    $totalLotes = count($lotes);
+    $loteAtual = isset($_GET['lote']) ? (int) $_GET['lote'] : 1;
+
+    if ($loteAtual < 1 || $loteAtual > $totalLotes) {
+        responderJsonApi(422, [
+            'erro' => 'Lote inválido.',
+            'lote_informado' => $loteAtual,
+            'total_lotes' => $totalLotes,
+        ]);
+    }
+
+    $tickersLote = $lotes[$loteAtual - 1];
+    $resultado = chamarBrapi($token, $tickersLote, http_build_query(['fundamental' => 'true']));
+
+    if (!$resultado['sucesso']) {
+        responderJsonApi(502, [
+            'erro' => 'Falha ao consultar BRAPI.',
+            'http_code' => $resultado['http_code'],
+            'detalhes' => $resultado['erro'] ?: $resultado['resposta_bruta'],
+            'lote_atual' => $loteAtual,
+            'total_lotes' => $totalLotes,
+            'tickers_lote' => $tickersLote,
+            'url' => $resultado['url'],
+        ]);
+    }
+
+    try {
+        $resumoPersistencia = salvarRespostaFundamentalsNoBanco($pdo, (array) $resultado['resposta'], $mapaTickers);
     } catch (Throwable $e) {
         responderJsonApi(500, [
             'erro' => 'Falha ao salvar dados no banco.',
