@@ -182,9 +182,53 @@ function registroJaExistePorComparacaoLocal(array $registrosExistentes, array $v
     return false;
 }
 
+function obterColunasChaveDedupe(string $tabela, array $colunasTabela): array
+{
+    $chavesPorTabela = [
+        'historical_data_price_1d' => ['id_ticker', 'date'],
+        'historical_data_price_5d' => ['id_ticker', 'date'],
+        'historical_data_price_1mo' => ['id_ticker', 'date'],
+        'historical_data_price_3mo' => ['id_ticker', 'date'],
+        'historical_data_price_6mo' => ['id_ticker', 'date'],
+        'historical_data_price_1y' => ['id_ticker', 'date'],
+        'historical_data_price_5y' => ['id_ticker', 'date'],
+        'historical_data_price_max' => ['id_ticker', 'date'],
+    ];
+
+    $chaves = $chavesPorTabela[$tabela] ?? [];
+    if (!is_array($chaves) || count($chaves) === 0) {
+        return [];
+    }
+
+    $chavesValidas = [];
+    foreach ($chaves as $chave) {
+        if (isset($colunasTabela[$chave])) {
+            $chavesValidas[] = $chave;
+        }
+    }
+
+    return $chavesValidas;
+}
+
+function montarValoresParaComparacao(array $colunas, array $valores, array $colunasChave): array
+{
+    $colunasComparacao = count($colunasChave) > 0 ? $colunasChave : $colunas;
+
+    $valoresPorColuna = [];
+    foreach ($colunasComparacao as $coluna) {
+        $placeholder = ':' . $coluna;
+        if (array_key_exists($placeholder, $valores)) {
+            $valoresPorColuna[$coluna] = $valores[$placeholder];
+        }
+    }
+
+    return $valoresPorColuna;
+}
+
 function salvarRespostaModuloEmTabela(PDO $pdo, array $resultadoBrapi, array $mapaTickers, string $modulo, string $tabela): array
 {
     $colunasTabela = buscarColunasTabela($pdo, $tabela);
+    $colunasChaveDedupe = obterColunasChaveDedupe($tabela, $colunasTabela);
 
     if (empty($colunasTabela)) {
         throw new RuntimeException("Tabela de destino não encontrada ou sem colunas: {$tabela}");
@@ -258,13 +302,7 @@ function salvarRespostaModuloEmTabela(PDO $pdo, array $resultadoBrapi, array $ma
                 continue;
             }
 
-            $valoresPorColuna = [];
-            foreach ($colunas as $coluna) {
-                $placeholder = ':' . $coluna;
-                if (array_key_exists($placeholder, $valores)) {
-                    $valoresPorColuna[$coluna] = $valores[$placeholder];
-                }
-            }
+            $valoresPorColuna = montarValoresParaComparacao($colunas, $valores, $colunasChaveDedupe);
 
             if (registroJaExistePorComparacaoLocal($cacheRegistrosExistentes[$idTicker], $valoresPorColuna)) {
                 $totalIgnorados++;
