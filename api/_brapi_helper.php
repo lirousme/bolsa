@@ -193,6 +193,7 @@ function obterColunasChaveDedupe(string $tabela, array $colunasTabela): array
         'historical_data_price_1y' => ['id_ticker', 'date'],
         'historical_data_price_5y' => ['id_ticker', 'date'],
         'historical_data_price_max' => ['id_ticker', 'date'],
+        'income_statement_history_quarterly' => ['id_ticker', 'end_date'],
     ];
 
     $chaves = $chavesPorTabela[$tabela] ?? [];
