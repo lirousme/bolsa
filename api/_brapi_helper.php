@@ -87,6 +87,38 @@ function camelParaSnake(string $valor): string
     return strtolower((string) $snake);
 }
 
+function resolverNomeColuna(string $atributo, string $tabela, array $colunasTabela): ?string
+{
+    $colunaPadrao = camelParaSnake($atributo);
+    if (isset($colunasTabela[$colunaPadrao])) {
+        return $colunaPadrao;
+    }
+
+    $aliasPorTabela = [
+        'balance_sheet_history' => [
+            'financial_assets_measured_at_fair_value_through_profit_or_loss' => 'financial_assets_fv_profit_loss',
+            'long_term_financial_investments_measured_at_fair_value_through_income' => 'long_term_fin_inv_fv_income',
+            'financial_investments_measured_at_amortized_cost' => 'financial_investments_amortized_cost',
+            'financial_investments_fv_through_oci' => 'financial_investments_fv_oci',
+            'financial_liabilities_measured_at_fair_value_through_income' => 'financial_liab_fv_income',
+        ],
+        'balance_sheet_history_quarterly' => [
+            'financial_assets_measured_at_fair_value_through_profit_or_loss' => 'financial_assets_fv_profit_loss',
+            'long_term_financial_investments_measured_at_fair_value_through_income' => 'long_term_fin_inv_fv_income',
+            'financial_investments_measured_at_amortized_cost' => 'financial_investments_amortized_cost',
+            'financial_investments_fv_through_oci' => 'financial_investments_fv_oci',
+            'financial_liabilities_measured_at_fair_value_through_income' => 'financial_liab_fv_income',
+        ],
+    ];
+
+    $aliasTabela = $aliasPorTabela[$tabela] ?? [];
+    if (isset($aliasTabela[$colunaPadrao]) && isset($colunasTabela[$aliasTabela[$colunaPadrao]])) {
+        return $aliasTabela[$colunaPadrao];
+    }
+
+    return null;
+}
+
 function buscarColunasTabela(PDO $pdo, string $tabela): array
 {
     $stmt = $pdo->prepare("SHOW COLUMNS FROM `{$tabela}`");
@@ -284,8 +316,8 @@ function salvarRespostaModuloEmTabela(PDO $pdo, array $resultadoBrapi, array $ma
             }
 
             foreach ($linha as $atributo => $valor) {
-                $coluna = camelParaSnake((string) $atributo);
-                if (!isset($colunasTabela[$coluna])) {
+                $coluna = resolverNomeColuna((string) $atributo, $tabela, $colunasTabela);
+                if ($coluna === null) {
                     continue;
                 }
 
