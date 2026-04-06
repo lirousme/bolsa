@@ -8,4 +8,4 @@ processarEndpointBrapi([
     'range' => '5d',
     'interval' => '1d',
     'fundamental' => 'true',
-]);
+], 'historico_de_cotacao');
