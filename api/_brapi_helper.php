@@ -123,6 +123,8 @@ function registroJaExiste(PDO $pdo, string $tabela, array $colunas, array $valor
         return false;
     }
 
+    $colunas = selecionarColunasParaDeduplicacao($colunas, $valores);
+
     $condicoes = [];
     foreach ($colunas as $coluna) {
         $placeholder = ':' . $coluna;
@@ -142,6 +144,47 @@ function registroJaExiste(PDO $pdo, string $tabela, array $colunas, array $valor
     $stmt->execute($valores);
 
     return (bool) $stmt->fetchColumn();
+}
+
+function selecionarColunasParaDeduplicacao(array $colunas, array $valores): array
+{
+    $colunasDisponiveis = array_values(array_unique($colunas));
+    if (count($colunasDisponiveis) === 0) {
+        return [];
+    }
+
+    $possuiColuna = static function (string $coluna) use ($colunasDisponiveis, $valores): bool {
+        return in_array($coluna, $colunasDisponiveis, true) && array_key_exists(':' . $coluna, $valores);
+    };
+
+    if (!$possuiColuna('id_ticker')) {
+        return $colunasDisponiveis;
+    }
+
+    $camposPrioritarios = [
+        'date',
+        'datetime',
+        'fiscal_date_ending',
+        'as_of_date',
+        'reference_date',
+        'payment_date',
+        'approved_on',
+        'last_dividend_date',
+        'ex_dividend_date',
+        'record_date',
+    ];
+
+    foreach ($camposPrioritarios as $campo) {
+        if ($possuiColuna($campo)) {
+            return ['id_ticker', $campo];
+        }
+    }
+
+    if ($possuiColuna('period') && $possuiColuna('type')) {
+        return ['id_ticker', 'period', 'type'];
+    }
+
+    return $colunasDisponiveis;
 }
 
 function salvarRespostaModuloEmTabela(PDO $pdo, array $resultadoBrapi, array $mapaTickers, string $modulo, string $tabela): array
