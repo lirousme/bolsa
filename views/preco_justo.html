@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preço Justo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class'
+        };
+    </script>
+</head>
+<body class="min-h-screen bg-slate-100 p-6 text-slate-800 dark:bg-slate-950 dark:text-slate-100">
+    <main class="mx-auto max-w-3xl rounded-2xl bg-white/90 p-6 shadow-xl ring-1 ring-slate-200 backdrop-blur dark:bg-slate-900/90 dark:ring-slate-800">
+        <header class="mb-8">
+            <a id="linkVoltar" href="./perfil_da_empresas.html" class="text-sm text-blue-600 hover:underline dark:text-blue-300">← Voltar para perfil da empresa</a>
+            <h1 class="mt-2 text-2xl font-bold md:text-3xl">Preço Justo do Ticker</h1>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                Ticker: <span id="tickerNome" class="font-semibold">Carregando...</span>
+            </p>
+        </header>
+
+        <div id="mensagem" class="mb-4 hidden rounded-lg p-3 text-sm"></div>
+
+        <section id="cardPrecoJusto" class="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 shadow-sm dark:border-emerald-900/70 dark:bg-emerald-950/40">
+            <p class="text-xs uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Resultado calculado</p>
+            <p id="valorPrecoJusto" class="mt-2 text-4xl font-extrabold text-emerald-800 dark:text-emerald-200">-</p>
+            <p class="mt-4 text-sm text-slate-700 dark:text-slate-300">Fórmula aplicada:</p>
+            <code id="formulaUsada" class="mt-1 inline-block rounded-md bg-white px-3 py-2 text-sm text-slate-800 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-700">-</code>
+        </section>
+    </main>
+
+    <script>
+        const parametros = new URLSearchParams(window.location.search);
+        const idEmpresa = Number.parseInt(parametros.get('id_empresa'), 10);
+        const idTicker = Number.parseInt(parametros.get('id_ticker'), 10);
+        const ticker = (parametros.get('ticker') || '').trim();
+
+        const linkVoltar = document.getElementById('linkVoltar');
+        const tickerNome = document.getElementById('tickerNome');
+        const mensagem = document.getElementById('mensagem');
+        const cardPrecoJusto = document.getElementById('cardPrecoJusto');
+        const valorPrecoJusto = document.getElementById('valorPrecoJusto');
+        const formulaUsada = document.getElementById('formulaUsada');
+
+        if (Number.isInteger(idEmpresa) && idEmpresa > 0) {
+            linkVoltar.href = `./perfil_da_empresas.html?id=${idEmpresa}`;
+        }
+
+        tickerNome.textContent = ticker || `#${idTicker || '-'}`;
+
+        function mostrarMensagem(texto, tipo = 'erro') {
+            mensagem.textContent = texto;
+            mensagem.className = 'mb-4 rounded-lg p-3 text-sm';
+
+            if (tipo === 'sucesso') {
+                mensagem.classList.add('bg-emerald-100', 'text-emerald-900', 'dark:bg-emerald-950', 'dark:text-emerald-200');
+            } else {
+                mensagem.classList.add('bg-red-100', 'text-red-900', 'dark:bg-red-950', 'dark:text-red-200');
+            }
+
+            mensagem.classList.remove('hidden');
+        }
+
+        function formatarNumero(valor) {
+            return Number(valor).toLocaleString('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+        }
+
+        async function carregarPrecoJusto() {
+            if (!Number.isInteger(idTicker) || idTicker <= 0) {
+                cardPrecoJusto.classList.add('hidden');
+                mostrarMensagem('Informe um id_ticker válido na URL.', 'erro');
+                return;
+            }
+
+            try {
+                const resposta = await fetch(`../empresas/gerenciar_preco_justo.php?id_ticker=${idTicker}`);
+                const dados = await resposta.json();
+
+                if (!resposta.ok) {
+                    throw new Error(dados.erro || 'Falha ao calcular preço justo.');
+                }
+
+                valorPrecoJusto.textContent = formatarNumero(dados.preco_justo);
+                formulaUsada.textContent = `preco_justo = ${formatarNumero(dados.earnings_per_share)} × 10 = ${formatarNumero(dados.preco_justo)}`;
+            } catch (erro) {
+                cardPrecoJusto.classList.add('hidden');
+                mostrarMensagem(erro.message, 'erro');
+            }
+        }
+
+        carregarPrecoJusto();
+    </script>
+</body>
+</html>
