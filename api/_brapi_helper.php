@@ -225,6 +225,7 @@ function registroJaExistePorComparacaoLocal(array $registrosExistentes, array $v
 function obterColunasChaveDedupe(string $tabela, array $colunasTabela): array
 {
     $chavesPorTabela = [
+        'fundamentals' => ['id_ticker', 'regular_market_time'],
         'historical_data_price_1d' => ['id_ticker', 'date'],
         'historical_data_price_5d' => ['id_ticker', 'date'],
         'historical_data_price_1mo' => ['id_ticker', 'date'],
@@ -233,7 +234,22 @@ function obterColunasChaveDedupe(string $tabela, array $colunasTabela): array
         'historical_data_price_1y' => ['id_ticker', 'date'],
         'historical_data_price_5y' => ['id_ticker', 'date'],
         'historical_data_price_max' => ['id_ticker', 'date'],
+        'cash_dividends' => ['id_ticker', 'payment_date', 'label', 'rate'],
+        'balance_sheet_history' => ['id_ticker', 'end_date'],
+        'balance_sheet_history_quarterly' => ['id_ticker', 'end_date'],
+        'cashflow_history' => ['id_ticker', 'end_date'],
+        'cashflow_history_quarterly' => ['id_ticker', 'end_date'],
+        'default_key_statistics' => ['id_ticker', 'book_value'],
+        'default_key_statistics_history' => ['id_ticker', 'end_date'],
+        'default_key_statistics_history_quarterly' => ['id_ticker', 'end_date'],
+        'financial_data' => ['id_ticker', 'ebitda'],
+        'financial_data_history' => ['id_ticker', 'end_date'],
+        'financial_data_history_quarterly' => ['id_ticker', 'end_date'],
+        'income_statement_history' => ['id_ticker', 'end_date'],
         'income_statement_history_quarterly' => ['id_ticker', 'end_date'],
+        'summary_profile' => ['id_ticker', 'full_time_employees'],
+        'value_added_history' => ['id_ticker', 'end_date'],
+        'value_added_history_quarterly' => ['id_ticker', 'end_date'],
     ];
 
     $chaves = $chavesPorTabela[$tabela] ?? [];
@@ -379,6 +395,7 @@ function salvarRespostaDividendosNoBanco(PDO $pdo, array $resultadoBrapi, array 
 {
     $tabela = 'cash_dividends';
     $colunasTabela = buscarColunasTabela($pdo, $tabela);
+    $colunasChaveDedupe = obterColunasChaveDedupe($tabela, $colunasTabela);
 
     if (empty($colunasTabela)) {
         throw new RuntimeException("Tabela de destino não encontrada ou sem colunas: {$tabela}");
@@ -455,13 +472,7 @@ function salvarRespostaDividendosNoBanco(PDO $pdo, array $resultadoBrapi, array 
                 continue;
             }
 
-            $valoresPorColuna = [];
-            foreach ($colunas as $coluna) {
-                $placeholder = ':' . $coluna;
-                if (array_key_exists($placeholder, $valores)) {
-                    $valoresPorColuna[$coluna] = $valores[$placeholder];
-                }
-            }
+            $valoresPorColuna = montarValoresParaComparacao($colunas, $valores, $colunasChaveDedupe);
 
             if (registroJaExistePorComparacaoLocal($cacheRegistrosExistentes[$idTicker], $valoresPorColuna)) {
                 $totalIgnorados++;
@@ -491,6 +502,7 @@ function salvarRespostaFundamentalsNoBanco(PDO $pdo, array $resultadoBrapi, arra
 {
     $tabela = 'fundamentals';
     $colunasTabela = buscarColunasTabela($pdo, $tabela);
+    $colunasChaveDedupe = obterColunasChaveDedupe($tabela, $colunasTabela);
 
     if (empty($colunasTabela)) {
         throw new RuntimeException("Tabela de destino não encontrada ou sem colunas: {$tabela}");
@@ -560,13 +572,7 @@ function salvarRespostaFundamentalsNoBanco(PDO $pdo, array $resultadoBrapi, arra
             continue;
         }
 
-        $valoresPorColuna = [];
-        foreach ($colunas as $coluna) {
-            $placeholder = ':' . $coluna;
-            if (array_key_exists($placeholder, $valores)) {
-                $valoresPorColuna[$coluna] = $valores[$placeholder];
-            }
-        }
+        $valoresPorColuna = montarValoresParaComparacao($colunas, $valores, $colunasChaveDedupe);
 
         if (registroJaExistePorComparacaoLocal($cacheRegistrosExistentes[$idTicker], $valoresPorColuna)) {
             $totalIgnorados++;
