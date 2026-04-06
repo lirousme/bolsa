@@ -123,7 +123,9 @@ function registroJaExiste(PDO $pdo, string $tabela, array $colunas, array $valor
         return false;
     }
 
+    $colunas = array_values(array_unique($colunas));
     $condicoes = [];
+    $valoresFiltrados = [];
     foreach ($colunas as $coluna) {
         $placeholder = ':' . $coluna;
         if (!array_key_exists($placeholder, $valores)) {
@@ -131,6 +133,7 @@ function registroJaExiste(PDO $pdo, string $tabela, array $colunas, array $valor
         }
 
         $condicoes[] = "`{$coluna}` <=> {$placeholder}";
+        $valoresFiltrados[$placeholder] = $valores[$placeholder];
     }
 
     if (count($condicoes) === 0) {
@@ -139,7 +142,7 @@ function registroJaExiste(PDO $pdo, string $tabela, array $colunas, array $valor
 
     $sql = "SELECT 1 FROM `{$tabela}` WHERE " . implode(' AND ', $condicoes) . ' LIMIT 1';
     $stmt = $pdo->prepare($sql);
-    $stmt->execute($valores);
+    $stmt->execute($valoresFiltrados);
 
     return (bool) $stmt->fetchColumn();
 }
@@ -202,6 +205,10 @@ function salvarRespostaModuloEmTabela(PDO $pdo, array $resultadoBrapi, array $ma
                 }
 
                 $placeholder = ':' . $coluna;
+                if (array_key_exists($placeholder, $valores)) {
+                    continue;
+                }
+
                 $colunas[] = $coluna;
                 $valores[$placeholder] = $valor;
             }
@@ -302,6 +309,10 @@ function salvarRespostaDividendosNoBanco(PDO $pdo, array $resultadoBrapi, array 
                 }
 
                 $placeholder = ':' . $coluna;
+                if (array_key_exists($placeholder, $valores)) {
+                    continue;
+                }
+
                 $colunas[] = $coluna;
                 $valores[$placeholder] = $valor;
             }
@@ -389,6 +400,10 @@ function salvarRespostaFundamentalsNoBanco(PDO $pdo, array $resultadoBrapi, arra
             }
 
             $placeholder = ':' . $coluna;
+            if (array_key_exists($placeholder, $valores)) {
+                continue;
+            }
+
             $colunas[] = $coluna;
             $valores[$placeholder] = $valor;
         }
