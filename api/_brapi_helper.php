@@ -117,6 +117,33 @@ function prepararLinhasParaInsercao(mixed $dadosDoModulo): array
     return [];
 }
 
+function registroJaExiste(PDO $pdo, string $tabela, array $colunas, array $valores): bool
+{
+    if (count($colunas) === 0 || count($valores) === 0) {
+        return false;
+    }
+
+    $condicoes = [];
+    foreach ($colunas as $coluna) {
+        $placeholder = ':' . $coluna;
+        if (!array_key_exists($placeholder, $valores)) {
+            continue;
+        }
+
+        $condicoes[] = "`{$coluna}` <=> {$placeholder}";
+    }
+
+    if (count($condicoes) === 0) {
+        return false;
+    }
+
+    $sql = "SELECT 1 FROM `{$tabela}` WHERE " . implode(' AND ', $condicoes) . ' LIMIT 1';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($valores);
+
+    return (bool) $stmt->fetchColumn();
+}
+
 function salvarRespostaModuloEmTabela(PDO $pdo, array $resultadoBrapi, array $mapaTickers, string $modulo, string $tabela): array
 {
     $colunasTabela = buscarColunasTabela($pdo, $tabela);
@@ -180,6 +207,11 @@ function salvarRespostaModuloEmTabela(PDO $pdo, array $resultadoBrapi, array $ma
             }
 
             if (count($colunas) === 0 || (count($colunas) === 1 && $colunas[0] === 'id_ticker')) {
+                $totalIgnorados++;
+                continue;
+            }
+
+            if (registroJaExiste($pdo, $tabela, $colunas, $valores)) {
                 $totalIgnorados++;
                 continue;
             }
@@ -279,6 +311,11 @@ function salvarRespostaDividendosNoBanco(PDO $pdo, array $resultadoBrapi, array 
                 continue;
             }
 
+            if (registroJaExiste($pdo, $tabela, $colunas, $valores)) {
+                $totalIgnorados++;
+                continue;
+            }
+
             $colunasSql = implode(', ', array_map(static fn ($c) => "`{$c}`", $colunas));
             $placeholdersSql = implode(', ', array_keys($valores));
             $sql = "INSERT INTO `{$tabela}` ({$colunasSql}) VALUES ({$placeholdersSql})";
@@ -357,6 +394,11 @@ function salvarRespostaFundamentalsNoBanco(PDO $pdo, array $resultadoBrapi, arra
         }
 
         if (count($colunas) === 0 || (count($colunas) === 1 && $colunas[0] === 'id_ticker')) {
+            $totalIgnorados++;
+            continue;
+        }
+
+        if (registroJaExiste($pdo, $tabela, $colunas, $valores)) {
             $totalIgnorados++;
             continue;
         }
