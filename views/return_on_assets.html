@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Return on Assets (ROA)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class'
+        };
+    </script>
+</head>
+<body class="bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-100 min-h-screen p-6">
+    <main class="mx-auto max-w-6xl rounded-2xl bg-white/90 p-6 shadow-xl ring-1 ring-slate-200 backdrop-blur dark:bg-slate-900/90 dark:ring-slate-800">
+        <header class="mb-6">
+            <a id="linkVoltar" href="./perfil_da_empresas.html" class="text-sm text-blue-600 hover:underline dark:text-blue-300">← Voltar para perfil da empresa</a>
+            <h1 class="mt-2 text-2xl font-bold md:text-3xl">Desempenho de Return on Assets (ROA)</h1>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                Ticker: <span id="tickerNome" class="font-semibold">Carregando...</span>
+            </p>
+        </header>
+
+        <div id="mensagem" class="mb-4 hidden rounded-lg p-3 text-sm"></div>
+
+        <section class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/80">
+            <div class="mb-4 grid gap-3 md:grid-cols-3">
+                <div class="rounded-lg bg-white p-3 shadow-sm dark:bg-slate-900/70">
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total de períodos</p>
+                    <p id="totalPeriodos" class="mt-1 text-lg font-bold">-</p>
+                </div>
+                <div class="rounded-lg bg-white p-3 shadow-sm dark:bg-slate-900/70">
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Maior ROA</p>
+                    <p id="maiorRoa" class="mt-1 text-lg font-bold">-</p>
+                </div>
+                <div class="rounded-lg bg-white p-3 shadow-sm dark:bg-slate-900/70">
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Menor ROA</p>
+                    <p id="menorRoa" class="mt-1 text-lg font-bold">-</p>
+                </div>
+            </div>
+
+            <div id="grafico" class="space-y-2">
+                <div class="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
+                    Carregando gráfico...
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const parametros = new URLSearchParams(window.location.search);
+        const idEmpresa = Number.parseInt(parametros.get('id_empresa'), 10);
+        const idTicker = Number.parseInt(parametros.get('id_ticker'), 10);
+        const ticker = (parametros.get('ticker') || '').trim();
+
+        const linkVoltar = document.getElementById('linkVoltar');
+        const tickerNome = document.getElementById('tickerNome');
+        const mensagem = document.getElementById('mensagem');
+        const grafico = document.getElementById('grafico');
+        const totalPeriodos = document.getElementById('totalPeriodos');
+        const maiorRoa = document.getElementById('maiorRoa');
+        const menorRoa = document.getElementById('menorRoa');
+
+        if (Number.isInteger(idEmpresa) && idEmpresa > 0) {
+            linkVoltar.href = `./perfil_da_empresas.html?id=${idEmpresa}`;
+        }
+
+        tickerNome.textContent = ticker || `#${idTicker || '-'}`;
+
+        function mostrarMensagem(texto, tipo) {
+            mensagem.textContent = texto;
+            mensagem.className = 'mb-4 rounded-lg p-3 text-sm';
+
+            if (tipo === 'sucesso') {
+                mensagem.classList.add('bg-emerald-100', 'text-emerald-900', 'dark:bg-emerald-950', 'dark:text-emerald-200');
+            } else {
+                mensagem.classList.add('bg-red-100', 'text-red-900', 'dark:bg-red-950', 'dark:text-red-200');
+            }
+
+            mensagem.classList.remove('hidden');
+        }
+
+        function ocultarMensagem() {
+            mensagem.classList.add('hidden');
+        }
+
+        function formatarPercentual(valor) {
+            if (valor === null || Number.isNaN(Number(valor))) {
+                return 'Sem dados';
+            }
+
+            return `${(Number(valor) * 100).toLocaleString('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            })}%`;
+        }
+
+        function formatarData(valor) {
+            if (!valor) {
+                return '-';
+            }
+
+            const data = new Date(`${valor}T00:00:00`);
+            if (Number.isNaN(data.getTime())) {
+                return valor;
+            }
+
+            return data.toLocaleDateString('pt-BR');
+        }
+
+        function escaparHtml(texto) {
+            return String(texto)
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
+
+        function renderizarGrafico(registros) {
+            if (!Array.isArray(registros) || registros.length === 0) {
+                totalPeriodos.textContent = '0';
+                maiorRoa.textContent = '-';
+                menorRoa.textContent = '-';
+                grafico.innerHTML = `
+                    <div class="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
+                        Nenhum registro encontrado para este ticker na tabela financial_data_history_quarterly.
+                    </div>
+                `;
+                return;
+            }
+
+            const valoresValidos = registros
+                .map((item) => Number(item.return_on_assets))
+                .filter((valor) => Number.isFinite(valor));
+
+            totalPeriodos.textContent = String(registros.length);
+            maiorRoa.textContent = valoresValidos.length > 0
+                ? formatarPercentual(Math.max(...valoresValidos))
+                : 'Sem dados';
+            menorRoa.textContent = valoresValidos.length > 0
+                ? formatarPercentual(Math.min(...valoresValidos))
+                : 'Sem dados';
+
+            const maiorAbsoluto = valoresValidos.length > 0
+                ? Math.max(...valoresValidos.map((valor) => Math.abs(valor)))
+                : 0;
+
+            grafico.innerHTML = registros.map((registro) => {
+                const valor = Number(registro.return_on_assets);
+                const temValor = Number.isFinite(valor);
+                const larguraBase = maiorAbsoluto > 0 && temValor
+                    ? (Math.abs(valor) / maiorAbsoluto) * 50
+                    : 0;
+
+                const largura = Math.min(50, Math.max(0, larguraBase));
+                const ladoEsquerdo = valor < 0;
+                const estiloBarra = ladoEsquerdo
+                    ? `left: ${50 - largura}%; width: ${largura}%;`
+                    : `left: 50%; width: ${largura}%;`;
+
+                return `
+                    <article class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/70">
+                        <div class="mb-2 flex items-center justify-between gap-2 text-sm">
+                            <span class="font-medium">${escaparHtml(formatarData(registro.end_date))}</span>
+                            <span class="font-semibold ${temValor && valor < 0 ? 'text-red-600 dark:text-red-300' : 'text-emerald-700 dark:text-emerald-300'}">${escaparHtml(formatarPercentual(registro.return_on_assets))}</span>
+                        </div>
+                        <div class="relative h-7 overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800">
+                            <div class="absolute inset-y-0 left-1/2 w-px bg-slate-400/70 dark:bg-slate-500/70"></div>
+                            ${temValor ? `<div class="absolute inset-y-1 rounded ${ladoEsquerdo ? 'bg-red-500/80' : 'bg-emerald-500/80'}" style="${estiloBarra}"></div>` : ''}
+                        </div>
+                    </article>
+                `;
+            }).join('');
+        }
+
+        async function carregarHistoricoRoa() {
+            ocultarMensagem();
+
+            if (!Number.isInteger(idTicker) || idTicker <= 0) {
+                mostrarMensagem('Informe um id_ticker válido na URL.', 'erro');
+                grafico.innerHTML = '';
+                return;
+            }
+
+            try {
+                const resposta = await fetch(`../empresas/gerenciar_return_on_assets.php?id_ticker=${idTicker}`);
+                const dados = await resposta.json();
+
+                if (!resposta.ok) {
+                    throw new Error(dados.erro || 'Falha ao carregar os dados de return_on_assets.');
+                }
+
+                renderizarGrafico(dados.historico);
+            } catch (erro) {
+                grafico.innerHTML = `
+                    <div class="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
+                        Não foi possível carregar o gráfico de ROA.
+                    </div>
+                `;
+                mostrarMensagem(erro.message, 'erro');
+            }
+        }
+
+        carregarHistoricoRoa();
+    </script>
+</body>
+</html>
