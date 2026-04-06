@@ -94,26 +94,34 @@ function resolverNomeColuna(string $atributo, string $tabela, array $colunasTabe
         return $colunaPadrao;
     }
 
-    $aliasPorTabela = [
-        'balance_sheet_history' => [
-            'financial_assets_measured_at_fair_value_through_profit_or_loss' => 'financial_assets_fv_profit_loss',
-            'long_term_financial_investments_measured_at_fair_value_through_income' => 'long_term_fin_inv_fv_income',
-            'financial_investments_measured_at_amortized_cost' => 'financial_investments_amortized_cost',
-            'financial_investments_fv_through_oci' => 'financial_investments_fv_oci',
-            'financial_liabilities_measured_at_fair_value_through_income' => 'financial_liab_fv_income',
-        ],
-        'balance_sheet_history_quarterly' => [
-            'financial_assets_measured_at_fair_value_through_profit_or_loss' => 'financial_assets_fv_profit_loss',
-            'long_term_financial_investments_measured_at_fair_value_through_income' => 'long_term_fin_inv_fv_income',
-            'financial_investments_measured_at_amortized_cost' => 'financial_investments_amortized_cost',
-            'financial_investments_fv_through_oci' => 'financial_investments_fv_oci',
-            'financial_liabilities_measured_at_fair_value_through_income' => 'financial_liab_fv_income',
-        ],
+    $aliasBalanceSheet = [
+        'financial_assets_measured_at_fair_value_through_profit_or_loss' => 'financial_assets_fv_profit_loss',
+        'long_term_financial_investments_measured_at_fair_value_through_income' => 'long_term_fin_inv_fv_income',
+        'financial_investments_measured_at_amortized_cost' => 'financial_investments_amortized_cost',
+        'financial_investments_fv_through_oci' => 'financial_investments_fv_oci',
+        'financial_liabilities_measured_at_fair_value_through_income' => 'financial_liab_fv_income',
     ];
 
+    $aliasPorTabela = [
+        'balance_sheet_history' => $aliasBalanceSheet,
+        'balance_sheet_history_quarterly' => $aliasBalanceSheet,
+    ];
+
+    $variacoesNomeColuna = [$colunaPadrao];
+    $colunaComSiglasNormalizadas = str_replace(
+        ['_f_v_', '_o_c_i_', '_p_l_'],
+        ['_fv_', '_oci_', '_pl_'],
+        $colunaPadrao
+    );
+    if ($colunaComSiglasNormalizadas !== $colunaPadrao) {
+        $variacoesNomeColuna[] = $colunaComSiglasNormalizadas;
+    }
+
     $aliasTabela = $aliasPorTabela[$tabela] ?? [];
-    if (isset($aliasTabela[$colunaPadrao]) && isset($colunasTabela[$aliasTabela[$colunaPadrao]])) {
-        return $aliasTabela[$colunaPadrao];
+    foreach ($variacoesNomeColuna as $variacao) {
+        if (isset($aliasTabela[$variacao]) && isset($colunasTabela[$aliasTabela[$variacao]])) {
+            return $aliasTabela[$variacao];
+        }
     }
 
     return null;
