@@ -121,6 +121,33 @@
         </div>
     </div>
 
+    <div class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/70 p-4" id="modalVariacaoHistoricoFundo">
+        <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+            <h2 class="mb-2 text-xl font-semibold">Histórico de cotações</h2>
+            <p class="text-sm text-slate-600 dark:text-slate-300">Escolha a variação de tempo para executar o end point.</p>
+
+            <label for="variacaoHistoricoSelect" class="mt-4 block text-sm text-slate-600 dark:text-slate-300">Variação</label>
+            <select
+                id="variacaoHistoricoSelect"
+                class="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-800"
+            >
+                <option value="1d">1d (range=1d, interval=1m)</option>
+                <option value="5d">5d (range=5d, interval=5m)</option>
+                <option value="1mo" selected>1mo (range=1mo, interval=1d)</option>
+                <option value="3mo">3mo (range=3mo, interval=1d)</option>
+                <option value="6mo">6mo (range=6mo, interval=1d)</option>
+                <option value="1y">1y (range=1y, interval=1wk)</option>
+                <option value="5y">5y (range=5y, interval=1wk)</option>
+                <option value="max">max (range=max, interval=1mo)</option>
+            </select>
+
+            <div class="mt-6 flex justify-end gap-2">
+                <button class="rounded-lg bg-slate-200 px-4 py-2 text-slate-800 transition hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600" id="fecharModalVariacaoHistorico" type="button">Cancelar</button>
+                <button class="rounded-lg bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-500" id="confirmarVariacaoHistorico" type="button">Continuar</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const parametros = new URLSearchParams(window.location.search);
         const idEmpresa = Number.parseInt(parametros.get('id_empresa'), 10);
@@ -133,9 +160,11 @@
         const modalEndPointFundo = document.getElementById('modalEndPointFundo');
         const modalDetalhesFundo = document.getElementById('modalDetalhesFundo');
         const modalExecucaoFundo = document.getElementById('modalExecucaoFundo');
+        const modalVariacaoHistoricoFundo = document.getElementById('modalVariacaoHistoricoFundo');
         const statusExecucao = document.getElementById('statusExecucao');
         const detalhesExecucao = document.getElementById('detalhesExecucao');
         const barraExecucao = document.getElementById('barraExecucao');
+        const variacaoHistoricoSelect = document.getElementById('variacaoHistoricoSelect');
 
         const nomeInput = document.getElementById('nomeInput');
         const estruturaInput = document.getElementById('estruturaInput');
@@ -146,6 +175,7 @@
 
         let endPointsCache = [];
         let endPointSelecionadoId = null;
+        let endPointPendenteVariacao = null;
 
         if (Number.isInteger(idEmpresa) && idEmpresa > 0) {
             linkVoltar.href = `./perfil_da_empresas.html?id=${idEmpresa}`;
@@ -217,6 +247,15 @@
                     const endPoint = endPointsCache.find((item) => Number(item.id) === id);
                     if (!endPoint) {
                         mostrarMensagem('End point não encontrado para execução.', 'erro');
+                        return;
+                    }
+
+                    if (precisaSelecionarVariacao(endPoint)) {
+                        endPointPendenteVariacao = endPoint;
+                        variacaoHistoricoSelect.value = '1mo';
+                        modalVariacaoHistoricoFundo.classList.remove('hidden');
+                        modalVariacaoHistoricoFundo.classList.add('flex');
+                        variacaoHistoricoSelect.focus();
                         return;
                     }
 
@@ -327,7 +366,19 @@
             barraExecucao.style.width = `${percentual}%`;
         }
 
-        async function chamarEndPoint(endPoint) {
+        function fecharModalVariacaoHistorico() {
+            endPointPendenteVariacao = null;
+            modalVariacaoHistoricoFundo.classList.remove('flex');
+            modalVariacaoHistoricoFundo.classList.add('hidden');
+        }
+
+        function precisaSelecionarVariacao(endPoint) {
+            const caminho = String(endPoint?.caminho || '').replace(/\\/g, '/').toLowerCase();
+            const nome = String(endPoint?.nome || '').toLowerCase();
+            return caminho.includes('historico_de_cotacao.php') || nome.includes('histórico de cotações') || nome.includes('historico de cotacoes');
+        }
+
+        async function chamarEndPoint(endPoint, opcoes = {}) {
             ocultarMensagem();
 
             const caminho = normalizarCaminhoApi(endPoint.caminho);
@@ -335,6 +386,8 @@
                 mostrarMensagem('Caminho do end point inválido.', 'erro');
                 return;
             }
+
+            const variacao = String(opcoes.variacao || '').trim();
 
             modalExecucaoFundo.classList.remove('hidden');
             modalExecucaoFundo.classList.add('flex');
@@ -349,8 +402,14 @@
                 while (loteAtual <= totalLotes) {
                     statusExecucao.textContent = `Processando lote ${loteAtual}...`;
 
+                    const parametrosRequisicao = new URLSearchParams();
+                    parametrosRequisicao.set('lote', String(loteAtual));
+                    if (variacao !== '') {
+                        parametrosRequisicao.set('variacao', variacao);
+                    }
+
                     const separador = caminho.includes('?') ? '&' : '?';
-                    const resposta = await fetch(`${caminho}${separador}lote=${loteAtual}`);
+                    const resposta = await fetch(`${caminho}${separador}${parametrosRequisicao.toString()}`);
                     const dados = await resposta.json();
 
                     if (!resposta.ok) {
@@ -366,6 +425,9 @@
                         tickersLote[0],
                         tickersLote[tickersLote.length - 1]
                     );
+                    if (variacao !== '') {
+                        detalhesExecucao.textContent += ` | Variação: ${variacao}`;
+                    }
 
                     console.log(`[BRAPI] ${endPoint.nome} | lote ${dados.lote_atual}/${dados.total_lotes}`, dados.dados);
                     loteAtual += 1;
@@ -471,6 +533,18 @@
             modalExecucaoFundo.classList.remove('flex');
             modalExecucaoFundo.classList.add('hidden');
         });
+        document.getElementById('fecharModalVariacaoHistorico').addEventListener('click', fecharModalVariacaoHistorico);
+        document.getElementById('confirmarVariacaoHistorico').addEventListener('click', async () => {
+            if (!endPointPendenteVariacao) {
+                fecharModalVariacaoHistorico();
+                return;
+            }
+
+            const endPoint = endPointPendenteVariacao;
+            const variacao = variacaoHistoricoSelect.value;
+            fecharModalVariacaoHistorico();
+            await chamarEndPoint(endPoint, { variacao });
+        });
 
         modalEndPointFundo.addEventListener('click', (evento) => {
             if (evento.target === modalEndPointFundo) {
@@ -489,6 +563,12 @@
             if (evento.target === modalExecucaoFundo) {
                 modalExecucaoFundo.classList.remove('flex');
                 modalExecucaoFundo.classList.add('hidden');
+            }
+        });
+
+        modalVariacaoHistoricoFundo.addEventListener('click', (evento) => {
+            if (evento.target === modalVariacaoHistoricoFundo) {
+                fecharModalVariacaoHistorico();
             }
         });
 
