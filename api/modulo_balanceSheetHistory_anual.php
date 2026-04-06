@@ -6,4 +6,4 @@ require_once __DIR__ . '/_brapi_helper.php';
 
 processarEndpointBrapi([
     'modules' => 'balanceSheetHistory',
-]);
+], 'balanceSheetHistory');
