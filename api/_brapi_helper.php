@@ -117,9 +117,8 @@ function prepararLinhasParaInsercao(mixed $dadosDoModulo): array
     return [];
 }
 
-function salvarRespostaNoBanco(PDO $pdo, array $resultadoBrapi, array $mapaTickers, string $modulo): array
+function salvarRespostaModuloEmTabela(PDO $pdo, array $resultadoBrapi, array $mapaTickers, string $modulo, string $tabela): array
 {
-    $tabela = camelParaSnake($modulo);
     $colunasTabela = buscarColunasTabela($pdo, $tabela);
 
     if (empty($colunasTabela)) {
@@ -201,6 +200,12 @@ function salvarRespostaNoBanco(PDO $pdo, array $resultadoBrapi, array $mapaTicke
         'ignorados' => $totalIgnorados,
         'sem_ticker' => $totalSemTicker,
     ];
+}
+
+function salvarRespostaNoBanco(PDO $pdo, array $resultadoBrapi, array $mapaTickers, string $modulo): array
+{
+    $tabela = camelParaSnake($modulo);
+    return salvarRespostaModuloEmTabela($pdo, $resultadoBrapi, $mapaTickers, $modulo, $tabela);
 }
 
 function salvarRespostaDividendosNoBanco(PDO $pdo, array $resultadoBrapi, array $mapaTickers): array
@@ -616,6 +621,105 @@ function processarEndpointFundamentals(): void
         'lotes_restantes' => $totalLotes - $loteAtual,
         'tickers_lote' => $tickersLote,
         'url' => $resultado['url'],
+        'persistencia' => $resumoPersistencia,
+        'dados' => $resultado['resposta'],
+    ]);
+}
+
+function processarEndpointHistoricoCotacao(array $variacoes): void
+{
+    $variacaoSelecionada = (string) ($_GET['variacao'] ?? '1mo');
+    if (!isset($variacoes[$variacaoSelecionada])) {
+        $variacaoSelecionada = '1mo';
+    }
+
+    $configuracao = $variacoes[$variacaoSelecionada] ?? null;
+    if (!is_array($configuracao)) {
+        responderJsonApi(500, ['erro' => 'Configuração de variação inválida para histórico de cotações.']);
+    }
+
+    $range = (string) ($configuracao['range'] ?? '');
+    $interval = (string) ($configuracao['interval'] ?? '');
+    $tabela = (string) ($configuracao['tabela'] ?? '');
+    if ($range === '' || $interval === '' || $tabela === '') {
+        responderJsonApi(500, ['erro' => 'Configuração incompleta para histórico de cotações.']);
+    }
+
+    $pdo = obterConexaoBanco();
+    $mapaTickers = obterTickers($pdo);
+    $tickers = array_keys($mapaTickers);
+
+    if (count($tickers) === 0) {
+        responderJsonApi(422, ['erro' => 'Nenhum ticker encontrado na tabela tickers.']);
+    }
+
+    $token = getenv('TOKEN_BRAPI') ?: '';
+    if ($token === '') {
+        responderJsonApi(500, ['erro' => 'TOKEN_BRAPI não encontrado no .env.']);
+    }
+
+    $lotes = array_chunk($tickers, 20);
+    $totalLotes = count($lotes);
+    $loteAtual = isset($_GET['lote']) ? (int) $_GET['lote'] : 1;
+
+    if ($loteAtual < 1 || $loteAtual > $totalLotes) {
+        responderJsonApi(422, [
+            'erro' => 'Lote inválido.',
+            'lote_informado' => $loteAtual,
+            'total_lotes' => $totalLotes,
+        ]);
+    }
+
+    $tickersLote = $lotes[$loteAtual - 1];
+    $resultado = chamarBrapi(
+        $token,
+        $tickersLote,
+        http_build_query([
+            'range' => $range,
+            'interval' => $interval,
+            'fundamental' => 'true',
+        ])
+    );
+
+    if (!$resultado['sucesso']) {
+        responderJsonApi(502, [
+            'erro' => 'Falha ao consultar BRAPI.',
+            'http_code' => $resultado['http_code'],
+            'detalhes' => $resultado['erro'] ?: $resultado['resposta_bruta'],
+            'lote_atual' => $loteAtual,
+            'total_lotes' => $totalLotes,
+            'tickers_lote' => $tickersLote,
+            'url' => $resultado['url'],
+        ]);
+    }
+
+    try {
+        $resumoPersistencia = salvarRespostaModuloEmTabela(
+            $pdo,
+            (array) $resultado['resposta'],
+            $mapaTickers,
+            'historicalDataPrice',
+            $tabela
+        );
+    } catch (Throwable $e) {
+        responderJsonApi(500, [
+            'erro' => 'Falha ao salvar dados no banco.',
+            'detalhes' => $e->getMessage(),
+            'lote_atual' => $loteAtual,
+            'total_lotes' => $totalLotes,
+            'tickers_lote' => $tickersLote,
+        ]);
+    }
+
+    responderJsonApi(200, [
+        'lote_atual' => $loteAtual,
+        'total_lotes' => $totalLotes,
+        'lotes_restantes' => $totalLotes - $loteAtual,
+        'tickers_lote' => $tickersLote,
+        'url' => $resultado['url'],
+        'variacao' => $variacaoSelecionada,
+        'range' => $range,
+        'interval' => $interval,
         'persistencia' => $resumoPersistencia,
         'dados' => $resultado['resposta'],
     ]);
