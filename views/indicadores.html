@@ -37,6 +37,14 @@
                     Ver gráfico de ROA →
                 </a>
             </article>
+
+            <article class="rounded-xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-800">
+                <h2 class="text-lg font-semibold">Preço justo</h2>
+                <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Confira o cálculo e os detalhes do preço justo do ticker.</p>
+                <a id="linkPrecoJusto" class="mt-4 inline-flex items-center gap-2 text-violet-700 transition hover:underline dark:text-violet-300" href="#">
+                    Ver preço justo →
+                </a>
+            </article>
         </section>
     </main>
 
@@ -50,6 +58,7 @@
         const mensagemErro = document.getElementById('mensagemErro');
         const linkHistorico = document.getElementById('linkHistorico');
         const linkRoa = document.getElementById('linkRoa');
+        const linkPrecoJusto = document.getElementById('linkPrecoJusto');
         const linkVoltar = document.getElementById('linkVoltar');
 
         function mostrarErro(texto) {
@@ -67,6 +76,7 @@
             linkVoltar.href = `./perfil_da_empresas.html?id=${idEmpresa}`;
             linkHistorico.href = `./historico_de_cotacoes.html?${query}`;
             linkRoa.href = `./return_on_assets.html?${query}`;
+            linkPrecoJusto.href = `./preco_justo.html?${query}`;
         }
     </script>
 </body>
