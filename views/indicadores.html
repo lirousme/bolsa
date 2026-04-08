@@ -45,6 +45,14 @@
                     Ver preço justo →
                 </a>
             </article>
+
+            <article class="rounded-xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-800">
+                <h2 class="text-lg font-semibold">Volume</h2>
+                <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Visualize a variação histórica do volume de negociações.</p>
+                <a id="linkVolume" class="mt-4 inline-flex items-center gap-2 text-cyan-700 transition hover:underline dark:text-cyan-300" href="#">
+                    Ver gráfico de volume →
+                </a>
+            </article>
         </section>
     </main>
 
@@ -59,6 +67,7 @@
         const linkHistorico = document.getElementById('linkHistorico');
         const linkRoa = document.getElementById('linkRoa');
         const linkPrecoJusto = document.getElementById('linkPrecoJusto');
+        const linkVolume = document.getElementById('linkVolume');
         const linkVoltar = document.getElementById('linkVoltar');
 
         function mostrarErro(texto) {
@@ -77,6 +86,7 @@
             linkHistorico.href = `./historico_de_cotacoes.html?${query}`;
             linkRoa.href = `./return_on_assets.html?${query}`;
             linkPrecoJusto.href = `./preco_justo.html?${query}`;
+            linkVolume.href = `./volume_historico.html?${query}`;
         }
     </script>
 </body>

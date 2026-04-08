@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Histórico de Volume</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class'
+        };
+    </script>
+</head>
+<body class="bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-100 min-h-screen p-6">
+    <main class="mx-auto max-w-6xl rounded-2xl bg-white/90 p-6 shadow-xl ring-1 ring-slate-200 backdrop-blur dark:bg-slate-900/90 dark:ring-slate-800">
+        <header class="mb-6">
+            <a id="linkVoltar" href="./perfil_da_empresas.html" class="text-sm text-blue-600 hover:underline dark:text-blue-300">← Voltar para perfil da empresa</a>
+            <h1 class="mt-2 text-2xl font-bold md:text-3xl">Histórico de Volume Negociado</h1>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                Ticker: <span id="tickerNome" class="font-semibold">Carregando...</span>
+            </p>
+        </header>
+
+        <div id="mensagem" class="mb-4 hidden rounded-lg p-3 text-sm"></div>
+
+        <section class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/80">
+            <div class="mb-4 grid gap-3 md:grid-cols-3">
+                <div class="rounded-lg bg-white p-3 shadow-sm dark:bg-slate-900/70">
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total de dias</p>
+                    <p id="totalDias" class="mt-1 text-lg font-bold">-</p>
+                </div>
+                <div class="rounded-lg bg-white p-3 shadow-sm dark:bg-slate-900/70">
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Maior volume</p>
+                    <p id="maiorVolume" class="mt-1 text-lg font-bold">-</p>
+                </div>
+                <div class="rounded-lg bg-white p-3 shadow-sm dark:bg-slate-900/70">
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Menor volume</p>
+                    <p id="menorVolume" class="mt-1 text-lg font-bold">-</p>
+                </div>
+            </div>
+
+            <div id="grafico" class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900/70">
+                <div class="text-sm text-slate-600 dark:text-slate-300">Carregando gráfico...</div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const parametros = new URLSearchParams(window.location.search);
+        const idEmpresa = Number.parseInt(parametros.get('id_empresa'), 10);
+        const idTicker = Number.parseInt(parametros.get('id_ticker'), 10);
+        const ticker = (parametros.get('ticker') || '').trim();
+
+        const linkVoltar = document.getElementById('linkVoltar');
+        const tickerNome = document.getElementById('tickerNome');
+        const mensagem = document.getElementById('mensagem');
+        const grafico = document.getElementById('grafico');
+        const totalDias = document.getElementById('totalDias');
+        const maiorVolume = document.getElementById('maiorVolume');
+        const menorVolume = document.getElementById('menorVolume');
+
+        if (Number.isInteger(idEmpresa) && idEmpresa > 0) {
+            linkVoltar.href = `./perfil_da_empresas.html?id=${idEmpresa}`;
+        }
+
+        tickerNome.textContent = ticker || `#${idTicker || '-'}`;
+
+        function mostrarMensagem(texto, tipo) {
+            mensagem.textContent = texto;
+            mensagem.className = 'mb-4 rounded-lg p-3 text-sm';
+
+            if (tipo === 'sucesso') {
+                mensagem.classList.add('bg-emerald-100', 'text-emerald-900', 'dark:bg-emerald-950', 'dark:text-emerald-200');
+            } else {
+                mensagem.classList.add('bg-red-100', 'text-red-900', 'dark:bg-red-950', 'dark:text-red-200');
+            }
+
+            mensagem.classList.remove('hidden');
+        }
+
+        function ocultarMensagem() {
+            mensagem.classList.add('hidden');
+        }
+
+        function formatarNumero(valor) {
+            if (valor === null || Number.isNaN(Number(valor))) {
+                return 'Sem dados';
+            }
+
+            return Number(valor).toLocaleString('pt-BR');
+        }
+
+        function formatarData(valor) {
+            if (!valor) {
+                return '-';
+            }
+
+            const data = new Date(`${valor}T00:00:00`);
+            if (Number.isNaN(data.getTime())) {
+                return valor;
+            }
+
+            return data.toLocaleDateString('pt-BR');
+        }
+
+        function escaparHtml(texto) {
+            return String(texto)
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
+
+        function renderizarGrafico(registros) {
+            if (!Array.isArray(registros) || registros.length === 0) {
+                totalDias.textContent = '0';
+                maiorVolume.textContent = '-';
+                menorVolume.textContent = '-';
+
+                grafico.innerHTML = `
+                    <div class="text-sm text-slate-600 dark:text-slate-300">
+                        Nenhum registro encontrado para este ticker na tabela fundamentals.
+                    </div>
+                `;
+                return;
+            }
+
+            const registrosOrdenados = [...registros].sort((a, b) => {
+                const dataA = Date.parse(`${a.market_date || ''}T00:00:00`);
+                const dataB = Date.parse(`${b.market_date || ''}T00:00:00`);
+
+                if (Number.isNaN(dataA) && Number.isNaN(dataB)) {
+                    return 0;
+                }
+
+                if (Number.isNaN(dataA)) {
+                    return 1;
+                }
+
+                if (Number.isNaN(dataB)) {
+                    return -1;
+                }
+
+                return dataA - dataB;
+            });
+
+            const volumesValidos = registrosOrdenados
+                .map((item) => Number(item.regular_market_volume))
+                .filter((valor) => Number.isFinite(valor));
+
+            totalDias.textContent = String(registrosOrdenados.length);
+            maiorVolume.textContent = volumesValidos.length > 0
+                ? formatarNumero(Math.max(...volumesValidos))
+                : 'Sem dados';
+            menorVolume.textContent = volumesValidos.length > 0
+                ? formatarNumero(Math.min(...volumesValidos))
+                : 'Sem dados';
+
+            const maximo = volumesValidos.length > 0 ? Math.max(...volumesValidos) : 0;
+
+            grafico.innerHTML = `
+                <div class="mb-4 text-xs text-slate-500 dark:text-slate-400">Cada coluna representa o volume negociado no dia.</div>
+                <div class="overflow-x-auto">
+                    <div class="min-w-max">
+                        <div class="flex h-72 items-end gap-2 border-b border-slate-300 pb-3 dark:border-slate-600">
+                            ${registrosOrdenados.map((registro) => {
+                                const valor = Number(registro.regular_market_volume);
+                                const temValor = Number.isFinite(valor);
+                                const altura = temValor && maximo > 0
+                                    ? Math.max(2, Math.round((valor / maximo) * 100))
+                                    : 0;
+
+                                return `
+                                    <div class="group flex w-10 flex-col items-center justify-end gap-2">
+                                        <span class="hidden rounded bg-slate-900 px-2 py-1 text-[11px] text-white shadow group-hover:block dark:bg-slate-100 dark:text-slate-900">${escaparHtml(formatarNumero(valor))}</span>
+                                        <div class="w-full rounded-t bg-blue-500/80 transition hover:bg-blue-500" style="height: ${altura}%; min-height: ${temValor ? '6px' : '0'};"></div>
+                                        <span class="text-[10px] text-slate-600 dark:text-slate-300 whitespace-nowrap">${escaparHtml(formatarData(registro.market_date))}</span>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function carregarHistoricoVolume() {
+            ocultarMensagem();
+
+            if (!Number.isInteger(idTicker) || idTicker <= 0) {
+                mostrarMensagem('Informe um id_ticker válido na URL.', 'erro');
+                grafico.innerHTML = '';
+                return;
+            }
+
+            try {
+                const resposta = await fetch(`../empresas/gerenciar_volume_historico.php?id_ticker=${idTicker}`);
+                const dados = await resposta.json();
+
+                if (!resposta.ok) {
+                    throw new Error(dados.erro || 'Falha ao carregar os dados de volume.');
+                }
+
+                renderizarGrafico(dados.historico);
+            } catch (erro) {
+                grafico.innerHTML = `
+                    <div class="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
+                        Não foi possível carregar o gráfico de volume.
+                    </div>
+                `;
+                mostrarMensagem(erro.message, 'erro');
+            }
+        }
+
+        carregarHistoricoVolume();
+    </script>
+</body>
+</html>
