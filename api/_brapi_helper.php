@@ -179,6 +179,42 @@ function normalizarValorComparacao(mixed $valor): string
     return json_encode($valor, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '';
 }
 
+function normalizarValorDedupePorTabelaColuna(string $tabela, string $coluna, mixed $valor): mixed
+{
+    if ($tabela !== 'fundamentals' || $coluna !== 'regular_market_time') {
+        return $valor;
+    }
+
+    if ($valor === null) {
+        return null;
+    }
+
+    $valorTexto = trim((string) $valor);
+    if ($valorTexto === '') {
+        return '';
+    }
+
+    if (preg_match('/^(\d{4}-\d{2}-\d{2})/', $valorTexto, $matches) === 1) {
+        return $matches[1];
+    }
+
+    if (preg_match('/^\d+$/', $valorTexto) === 1) {
+        $timestamp = (int) $valorTexto;
+        if (strlen($valorTexto) >= 13) {
+            $timestamp = (int) floor($timestamp / 1000);
+        }
+
+        return gmdate('Y-m-d', $timestamp);
+    }
+
+    try {
+        $data = new DateTimeImmutable($valorTexto);
+        return $data->format('Y-m-d');
+    } catch (Exception) {
+        return $valorTexto;
+    }
+}
+
 function carregarRegistrosExistentesPorTicker(PDO $pdo, string $tabela, int $idTicker): array
 {
     $sql = "SELECT * FROM `{$tabela}` WHERE `id_ticker` = :id_ticker";
@@ -189,7 +225,7 @@ function carregarRegistrosExistentesPorTicker(PDO $pdo, string $tabela, int $idT
     return is_array($registros) ? $registros : [];
 }
 
-function registroJaExistePorComparacaoLocal(array $registrosExistentes, array $valoresPorColuna): bool
+function registroJaExistePorComparacaoLocal(string $tabela, array $registrosExistentes, array $valoresPorColuna): bool
 {
     if (count($valoresPorColuna) === 0) {
         return false;
@@ -207,8 +243,10 @@ function registroJaExistePorComparacaoLocal(array $registrosExistentes, array $v
                 break;
             }
 
-            $valorExistente = $registroExistente[$coluna];
-            if (normalizarValorComparacao($valorExistente) !== normalizarValorComparacao($valorNovo)) {
+            $valorExistente = normalizarValorDedupePorTabelaColuna($tabela, $coluna, $registroExistente[$coluna]);
+            $valorNovoNormalizado = normalizarValorDedupePorTabelaColuna($tabela, $coluna, $valorNovo);
+
+            if (normalizarValorComparacao($valorExistente) !== normalizarValorComparacao($valorNovoNormalizado)) {
                 $todosIguais = false;
                 break;
             }
@@ -361,7 +399,7 @@ function salvarRespostaModuloEmTabela(PDO $pdo, array $resultadoBrapi, array $ma
 
             $valoresPorColuna = montarValoresParaComparacao($colunas, $valores, $colunasChaveDedupe);
 
-            if (registroJaExistePorComparacaoLocal($cacheRegistrosExistentes[$idTicker], $valoresPorColuna)) {
+            if (registroJaExistePorComparacaoLocal($tabela, $cacheRegistrosExistentes[$idTicker], $valoresPorColuna)) {
                 $totalIgnorados++;
                 continue;
             }
@@ -474,7 +512,7 @@ function salvarRespostaDividendosNoBanco(PDO $pdo, array $resultadoBrapi, array 
 
             $valoresPorColuna = montarValoresParaComparacao($colunas, $valores, $colunasChaveDedupe);
 
-            if (registroJaExistePorComparacaoLocal($cacheRegistrosExistentes[$idTicker], $valoresPorColuna)) {
+            if (registroJaExistePorComparacaoLocal($tabela, $cacheRegistrosExistentes[$idTicker], $valoresPorColuna)) {
                 $totalIgnorados++;
                 continue;
             }
@@ -574,7 +612,7 @@ function salvarRespostaFundamentalsNoBanco(PDO $pdo, array $resultadoBrapi, arra
 
         $valoresPorColuna = montarValoresParaComparacao($colunas, $valores, $colunasChaveDedupe);
 
-        if (registroJaExistePorComparacaoLocal($cacheRegistrosExistentes[$idTicker], $valoresPorColuna)) {
+        if (registroJaExistePorComparacaoLocal($tabela, $cacheRegistrosExistentes[$idTicker], $valoresPorColuna)) {
             $totalIgnorados++;
             continue;
         }
